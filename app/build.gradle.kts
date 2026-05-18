@@ -1,24 +1,34 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
 
+// Lädt die local.properties für den Zugriff auf den Access Token
+val localProperties = Properties()
+val localPropertiesFile = rootProject.projectDir.resolve("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.inputStream().use { localProperties.load(it) }
+}
+
 android {
     namespace = "com.example.moco"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 35 
 
     defaultConfig {
         applicationId = "com.example.moco"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        // Fügt den Mapbox Access Token als String-Ressource hinzu.
+        // So bleibt der Token in der local.properties und landet nicht in Git.
+        val mapboxToken = localProperties.getProperty("MAPBOX_ACCESS_TOKEN") ?: ""
+        resValue("string", "mapbox_access_token", mapboxToken)
     }
 
     buildTypes {
@@ -43,6 +53,12 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
+    
+    // Hinzufügen der Mapbox Compose Library
+    implementation(libs.mapbox.compose)
+    // maps-android wird zwingend für Kamera-Zustände und Basis-Klassen benötigt
+    implementation(libs.mapbox.maps)
+    
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
