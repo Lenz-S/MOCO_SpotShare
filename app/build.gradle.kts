@@ -14,11 +14,13 @@ if (localPropertiesFile.exists()) {
 
 android {
     namespace = "com.example.moco"
-    compileSdk = 35 
+    // Erhöht auf 36, da neuere androidx-Abhängigkeiten dies zwingend erfordern
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.moco"
         minSdk = 24
+        // Beibehalten auf 35 für bessere Kompatibilität mit dem aktuellen Emulator/Mapbox
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
@@ -46,6 +48,8 @@ android {
     }
     buildFeatures {
         compose = true
+        // Ermöglicht das Hinzufügen von Ressourcen (wie dem Mapbox Token) direkt aus Gradle
+        resValues = true
     }
 }
 
@@ -53,11 +57,15 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
     
     // Hinzufügen der Mapbox Compose Library
     implementation(libs.mapbox.compose)
     // maps-android wird zwingend für Kamera-Zustände und Basis-Klassen benötigt
     implementation(libs.mapbox.maps)
+    
+    // Navigation Library für den Wechsel zwischen den Screens
+    implementation(libs.androidx.navigation.compose)
     
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
