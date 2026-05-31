@@ -73,7 +73,12 @@ fun MocoAppMain() {
             startDestination = Screen.Map.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(Screen.Map.route) { MapScreen() }
+            composable(Screen.Map.route) { 
+                // Der MapScreen erhält eine Funktion, um zum Suchbildschirm zu wechseln
+                MapScreen(
+                    onSearchClick = { navController.navigate(Screen.Search.route) }
+                ) 
+            }
             
             // Für alle anderen Screens wird eine Navigationsfunktion zum Zurückspringen auf die Karte mitgegeben
             val backToMap = {
