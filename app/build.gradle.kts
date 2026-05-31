@@ -14,13 +14,13 @@ if (localPropertiesFile.exists()) {
 
 android {
     namespace = "com.example.moco"
-    // Erhöht auf 36, da neuere androidx-Abhängigkeiten dies zwingend erfordern
+    // CompileSdk muss auf 36 bleiben, damit die Bibliotheken bauen
     compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.moco"
         minSdk = 24
-        // Beibehalten auf 35 für bessere Kompatibilität mit dem aktuellen Emulator/Mapbox
+        // TargetSdk auf 35 begrenzt, um Preview-Bugs der API 36 zu umgehen
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"

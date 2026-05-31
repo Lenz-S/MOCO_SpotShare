@@ -1,36 +1,28 @@
 package com.example.moco.ui.screens
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
+/**
+ * Screen zum Hinzufügen eines neuen Parkplatzes.
+ * Hier werden die Details wie Titel, Beschreibung und Preis abgefragt.
+ * 
+ * @param onBackClick Funktion zum Zurückkehren auf die Karte.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddSpotScreen(
-    onNavigateBack: () -> Unit,
-    onSaveSpot: (title: String, description: String, pricePerHour: Double) -> Unit
-) {
+fun AddSpotScreen(onBackClick: () -> Unit) {
+    // State-Variablen für die Eingabefelder
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var pricePerHour by remember { mutableStateOf("") }
@@ -41,9 +33,9 @@ fun AddSpotScreen(
             TopAppBar(
                 title = { Text("Neuen Parkplatz hinzufügen") },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = onBackClick) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Zurück"
                         )
                     }
@@ -60,6 +52,7 @@ fun AddSpotScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
+            // Eingabefeld für den Namen des Parkplatzes
             OutlinedTextField(
                 value = title,
                 onValueChange = {
@@ -79,6 +72,7 @@ fun AddSpotScreen(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
             )
 
+            // Eingabefeld für die Beschreibung
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
@@ -90,9 +84,11 @@ fun AddSpotScreen(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
             )
 
+            // Eingabefeld für den Preis (nur Zahlen erlaubt)
             OutlinedTextField(
                 value = pricePerHour,
                 onValueChange = { input ->
+                    // Erlaubt nur Zahlen und maximal zwei Nachkommastellen
                     if (input.isEmpty() || input.matches(Regex("""^\d*[.,]?\d{0,2}$"""))) {
                         pricePerHour = input
                     }
@@ -109,13 +105,14 @@ fun AddSpotScreen(
 
             Spacer(modifier = Modifier.weight(1f))
 
+            // Button zum Speichern (Logik wird später implementiert)
             Button(
                 onClick = {
                     if (title.isBlank()) {
                         titleError = true
                     } else {
-                        val price = pricePerHour.replace(',', '.').toDoubleOrNull() ?: 0.0
-                        onSaveSpot(title, description, price)
+                        // Hier käme später die Speicher-Logik hin
+                        onBackClick() // Vorläufig kehren wir einfach zurück
                     }
                 },
                 modifier = Modifier
@@ -124,36 +121,6 @@ fun AddSpotScreen(
             ) {
                 Text("Parkplatz erstellen", style = MaterialTheme.typography.titleMedium)
             }
-        }
-    }
-}
-
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AddSpotScreen(onBackClick: () -> Unit) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Parkplatz hinzufügen") },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Zurück zur Karte"
-                        )
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(text = "Formular zum Anlegen eines Parkplatzes")
         }
     }
 }

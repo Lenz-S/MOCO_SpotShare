@@ -16,7 +16,13 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.moco.ui.components.MocoBottomBar
 import com.example.moco.ui.navigation.Screen
-import com.example.moco.ui.screens.*
+import com.example.moco.ui.screens.AddSpotScreen
+import com.example.moco.ui.screens.FavoritesScreen
+import com.example.moco.ui.screens.MapScreen
+import com.example.moco.ui.screens.MessagesScreen
+import com.example.moco.ui.screens.MySpotsScreen
+import com.example.moco.ui.screens.ProfileScreen
+import com.example.moco.ui.screens.SearchScreen
 import com.example.moco.ui.theme.MOCOTheme
 
 /**
