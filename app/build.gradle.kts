@@ -51,6 +51,12 @@ android {
         // Ermöglicht das Hinzufügen von Ressourcen (wie dem Mapbox Token) direkt aus Gradle
         resValues = true
     }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
 }
 
 dependencies {
@@ -64,6 +70,11 @@ dependencies {
     // maps-android wird zwingend für Kamera-Zustände und Basis-Klassen benötigt
     implementation(libs.mapbox.maps)
     
+    // Mapbox Search SDK für Geocoding (Adresse -> Koordinaten)
+    implementation("com.mapbox.search:mapbox-search-android:2.1.0") {
+        exclude(group = "com.mapbox.common", module = "common")
+    }
+    
     // Navigation Library für den Wechsel zwischen den Screens
     implementation(libs.androidx.navigation.compose)
     
@@ -72,6 +83,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
