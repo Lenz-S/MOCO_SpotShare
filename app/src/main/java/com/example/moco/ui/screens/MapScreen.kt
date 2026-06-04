@@ -31,7 +31,9 @@ import com.mapbox.maps.plugin.viewport.data.FollowPuckViewportStateOptions
  * @param onSearchClick Navigation zum Suchbildschirm.
  */
 @Composable
-fun MapScreen(onSearchClick: () -> Unit) {
+fun MapScreen(
+    onSearchClick: () -> Unit
+) {
     val mapViewportState = rememberMapViewportState()
 
     // Dialog zur Abfrage der GPS-Berechtigungen (Fine & Coarse Location)

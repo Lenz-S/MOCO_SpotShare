@@ -16,13 +16,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.moco.ui.components.MocoBottomBar
 import com.example.moco.ui.navigation.Screen
-import com.example.moco.ui.screens.AddSpotScreen
-import com.example.moco.ui.screens.FavoritesScreen
-import com.example.moco.ui.screens.MapScreen
-import com.example.moco.ui.screens.MessagesScreen
-import com.example.moco.ui.screens.MySpotsScreen
-import com.example.moco.ui.screens.ProfileScreen
-import com.example.moco.ui.screens.SearchScreen
+import com.example.moco.ui.screens.*
 import com.example.moco.ui.theme.MOCOTheme
 
 /**
@@ -73,27 +67,30 @@ fun MocoAppMain() {
             startDestination = Screen.Map.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(Screen.Map.route) { 
-                // Der MapScreen erhält eine Funktion, um zum Suchbildschirm zu wechseln
+            composable(Screen.Map.route) {
+                // MapScreen ohne Suchergebnis-Logik
                 MapScreen(
                     onSearchClick = { navController.navigate(Screen.Search.route) }
+                )
+            }
+            
+            // Hilfsfunktion zum Zurückkehren auf die Karte
+            val backToMap = {
+                navController.popBackStack(Screen.Map.route, inclusive = false)
+            }
+            
+            composable(Screen.Profile.route) { ProfileScreen(onBackClick = { backToMap() }) }
+            composable(Screen.Messages.route) { MessagesScreen(onBackClick = { backToMap() }) }
+            composable(Screen.AddSpot.route) { AddSpotScreen(onBackClick = { backToMap() }) }
+            composable(Screen.Favorites.route) { FavoritesScreen(onBackClick = { backToMap() }) }
+            composable(Screen.MySpots.route) { MySpotsScreen(onBackClick = { backToMap() }) }
+            
+            composable(Screen.Search.route) { 
+                // SearchScreen ohne Rückgabe von Koordinaten
+                SearchScreen(
+                    onBackClick = { backToMap() }
                 ) 
             }
-            
-            // Für alle anderen Screens wird eine Navigationsfunktion zum Zurückspringen auf die Karte mitgegeben
-            val backToMap = {
-                navController.navigate(Screen.Map.route) {
-                    popUpTo(Screen.Map.route) { inclusive = false }
-                    launchSingleTop = true
-                }
-            }
-            
-            composable(Screen.Profile.route) { ProfileScreen(onBackClick = backToMap) }
-            composable(Screen.Messages.route) { MessagesScreen(onBackClick = backToMap) }
-            composable(Screen.AddSpot.route) { AddSpotScreen(onBackClick = backToMap) }
-            composable(Screen.Favorites.route) { FavoritesScreen(onBackClick = backToMap) }
-            composable(Screen.MySpots.route) { MySpotsScreen(onBackClick = backToMap) }
-            composable(Screen.Search.route) { SearchScreen(onBackClick = backToMap) }
         }
     }
 }
