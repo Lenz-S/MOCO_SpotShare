@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "651280452172",
+    "project_id": "moco-spotshare",
+    "storage_bucket": "moco-spotshare.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:651280452172:android:594fc2da16ea41b5d902e9",
+        "android_client_info": {
+          "package_name": "com.example.moco"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDlyMp4AoGfMlDjmu4eiQAMc--etWlvaIs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

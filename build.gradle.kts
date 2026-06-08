@@ -2,4 +2,6 @@
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.kotlin.compose) apply false
+    // Google Services Plugin für Firebase auf Projektebene hinzufügen
+    alias(libs.plugins.google.services) apply false
 }

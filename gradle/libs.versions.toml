@@ -11,6 +11,8 @@ composeBom = "2026.02.01"
 # Aktuelle Mapbox Version für Android
 mapboxCompose = "11.10.1"
 navigationCompose = "2.8.8"
+googleServices = "4.4.4"
+firebaseBom = "34.14.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -34,6 +36,14 @@ mapbox-compose = { group = "com.mapbox.extension", name = "maps-compose", versio
 mapbox-maps = { group = "com.mapbox.maps", name = "android", version.ref = "mapboxCompose" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 
+# Firebase Bibliotheken
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
+firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
+firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
+firebase-storage = { group = "com.google.firebase", name = "firebase-storage" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }

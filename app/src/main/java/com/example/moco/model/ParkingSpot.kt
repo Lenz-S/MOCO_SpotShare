@@ -16,10 +16,14 @@ data class ParkingSpot(
     // Geografische Koordinaten für Mapbox
     val latitude: Double,
     val longitude: Double,
-    // Preis pro Stunde (später für Routing/Buchung wichtig)
-    val pricePerHour: Double = 0.0,
     // Menschenlesbare Adresse
     val address: String = "",
+    // Für "Spot-Foto": Pfad oder URL zum aufgenommenen Bild
+    val imageUrl: String? = null,
+    // Für "QR-Check-In": Ein Code, der im QR-Code enthalten ist
+    val qrCodeData: String? = null,
+    // Für "Vermieter-Benachrichtigung": Wer mietet den Platz gerade?
+    val currentTenantId: String? = null,
     // Verfügbarkeitsstatus
     val isAvailable: Boolean = true,
     // ID des Erstellers/Besitzers
