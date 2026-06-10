@@ -65,6 +65,11 @@ dependencies {
     implementation(libs.mapbox.compose)
     // maps-android wird zwingend für Kamera-Zustände und Basis-Klassen benötigt
     implementation(libs.mapbox.maps)
+    // Mapbox Search SDK für Geocoding
+    implementation(libs.mapbox.search)
+    // Mapbox Java Services für den klassischen Geocoder
+    implementation(libs.mapbox.java.services)
+    implementation(libs.mapbox.java.geojson)
     
     // Navigation Library für den Wechsel zwischen den Screens
     implementation(libs.androidx.navigation.compose)

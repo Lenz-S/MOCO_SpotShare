@@ -1,5 +1,7 @@
 package com.example.moco.ui.screens
 
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -8,32 +10,52 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.example.moco.data.FirebaseHelper
+import com.example.moco.data.GeocodingHelper
+import com.example.moco.model.ParkingSpot
+import kotlinx.coroutines.launch
 
 /**
- * Screen zum Hinzufügen eines neuen Parkplatzes.
- * Hier werden die Details wie Titel, Beschreibung und Preis abgefragt.
+ * AddSpotScreen: Ermöglicht das Anlegen eines neuen Parkplatzes.
+ * Dieser Screen integriert Mapbox für das Geocoding und Firebase Firestore für die Speicherung.
  * 
- * @param onBackClick Funktion zum Zurückkehren auf die Karte.
+ * @param onBackClick Navigation zurück zur Kartenansicht.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddSpotScreen(onBackClick: () -> Unit) {
-    // State-Variablen für die Eingabefelder
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    
+    // Initialisierung der Daten-Helfer
+    val firebaseHelper = remember { FirebaseHelper() }
+    val geocodingHelper = remember { GeocodingHelper(context) }
+    val sharedPrefs = remember { context.getSharedPreferences("moco_prefs", Context.MODE_PRIVATE) }
+
+    // Zustandsvariablen für die Formulareingaben
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var pricePerHour by remember { mutableStateOf("") }
+    var address by remember { mutableStateOf("") }
+    
+    // Zustände für Validierung und Ladevorgang
     var titleError by remember { mutableStateOf(false) }
+    var addressError by remember { mutableStateOf(false) }
+    var isSaving by remember { mutableStateOf(false) }
+
+    // Abruf der im Profil hinterlegten Benutzer-ID
+    val currentUserId = sharedPrefs.getString("user_id", "user_number_one") ?: "user_number_one"
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Neuen Parkplatz hinzufügen") },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(onClick = onBackClick, enabled = !isSaving) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Zurück"
@@ -43,83 +65,134 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
             )
         }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-
-            // Eingabefeld für den Namen des Parkplatzes
-            OutlinedTextField(
-                value = title,
-                onValueChange = {
-                    title = it
-                    if (it.isNotBlank()) titleError = false
-                },
-                label = { Text("Titel / Name") },
-                placeholder = { Text("z.B. Tiefgarage Innenstadt") },
-                isError = titleError,
-                supportingText = {
-                    if (titleError) {
-                        Text("Der Titel darf nicht leer sein", color = MaterialTheme.colorScheme.error)
-                    }
-                },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
-            )
-
-            // Eingabefeld für die Beschreibung
-            OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
-                label = { Text("Beschreibung") },
-                placeholder = { Text("Details zum Parkplatz, Zufahrt, Besonderheiten...") },
-                minLines = 3,
-                maxLines = 5,
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
-            )
-
-            // Eingabefeld für den Preis (nur Zahlen erlaubt)
-            OutlinedTextField(
-                value = pricePerHour,
-                onValueChange = { input ->
-                    // Erlaubt nur Zahlen und maximal zwei Nachkommastellen
-                    if (input.isEmpty() || input.matches(Regex("""^\d*[.,]?\d{0,2}$"""))) {
-                        pricePerHour = input
-                    }
-                },
-                label = { Text("Gebühr pro Stunde (€)") },
-                placeholder = { Text("0.00") },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Number,
-                    imeAction = ImeAction.Done
-                ),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            // Button zum Speichern (Logik wird später implementiert)
-            Button(
-                onClick = {
-                    if (title.isBlank()) {
-                        titleError = true
-                    } else {
-                        // Hier käme später die Speicher-Logik hin
-                        onBackClick() // Vorläufig kehren wir einfach zurück
-                    }
-                },
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp)
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text("Parkplatz erstellen", style = MaterialTheme.typography.titleMedium)
+
+                // Eingabefeld für den Parkplatz-Namen
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = {
+                        title = it
+                        if (it.isNotBlank()) titleError = false
+                    },
+                    label = { Text("Titel / Name") },
+                    placeholder = { Text("z.B. Garage am Park") },
+                    isError = titleError,
+                    supportingText = {
+                        if (titleError) Text("Bitte gib einen Titel an", color = MaterialTheme.colorScheme.error)
+                    },
+                    singleLine = true,
+                    enabled = !isSaving,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+                )
+
+                // Eingabefeld für die physische Adresse (wird für Geocoding genutzt)
+                OutlinedTextField(
+                    value = address,
+                    onValueChange = {
+                        address = it
+                        if (it.isNotBlank()) addressError = false
+                    },
+                    label = { Text("Adresse") },
+                    placeholder = { Text("Straße, PLZ, Ort") },
+                    isError = addressError,
+                    supportingText = {
+                        if (addressError) Text("Die Adresse ist erforderlich", color = MaterialTheme.colorScheme.error)
+                    },
+                    singleLine = true,
+                    enabled = !isSaving,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+                )
+
+                // Eingabefeld für zusätzliche Details
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Beschreibung") },
+                    placeholder = { Text("Besonderheiten zur Zufahrt etc.") },
+                    minLines = 3,
+                    maxLines = 5,
+                    enabled = !isSaving,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
+                )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                // Speicher-Button mit integrierter Geocoding- und Firebase-Logik
+                Button(
+                    onClick = {
+                        when {
+                            title.isBlank() -> titleError = true
+                            address.isBlank() -> addressError = true
+                            else -> {
+                                isSaving = true
+                                scope.launch {
+                                    try {
+                                        // 1. Schritt: Adresse in Koordinaten umwandeln (Geocoding)
+                                        val coords = geocodingHelper.getCoordinatesFromAddress(address)
+                                        
+                                        // 2. Schritt: Datenmodell mit generierten und eingegebenen Werten befüllen
+                                        val newSpot = ParkingSpot(
+                                            title = title,
+                                            description = description,
+                                            address = address,
+                                            latitude = coords?.first ?: 0.0,
+                                            longitude = coords?.second ?: 0.0,
+                                            ownerId = currentUserId
+                                        )
+
+                                        // 3. Schritt: In der Cloud-Datenbank speichern
+                                        firebaseHelper.saveParkingSpot(newSpot)
+                                        
+                                        // Erfolgreich gespeichert -> Zurück zur Karte
+                                        isSaving = false
+                                        onBackClick()
+                                    } catch (e: Exception) {
+                                        // Fehlerbehandlung: UI entsperren und Fehlermeldung anzeigen
+                                        isSaving = false
+                                        Toast.makeText(
+                                            context, 
+                                            "Fehler: ${e.localizedMessage}", 
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    enabled = !isSaving,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                ) {
+                    if (isSaving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("Parkplatz erstellen", style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+            }
+            
+            // Graues Overlay während des Speichervorgangs zur visuellen Sperrung
+            if (isSaving) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
+                ) {}
             }
         }
     }

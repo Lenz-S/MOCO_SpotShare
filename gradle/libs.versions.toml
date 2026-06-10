@@ -10,6 +10,8 @@ kotlin = "2.2.10"
 composeBom = "2026.02.01"
 # Aktuelle Mapbox Version für Android
 mapboxCompose = "11.10.1"
+mapboxSearch = "2.8.0"
+mapboxJava = "7.3.0"
 navigationCompose = "2.8.8"
 googleServices = "4.4.4"
 firebaseBom = "34.14.0"
@@ -34,6 +36,11 @@ androidx-compose-material-icons-extended = { group = "androidx.compose.material"
 mapbox-compose = { group = "com.mapbox.extension", name = "maps-compose", version.ref = "mapboxCompose" }
 # Mapbox Core SDK - Wird benötigt für Klassen wie CameraState
 mapbox-maps = { group = "com.mapbox.maps", name = "android", version.ref = "mapboxCompose" }
+# Mapbox Search SDK für Geocoding (Adresse -> Koordinaten)
+mapbox-search = { group = "com.mapbox.search", name = "mapbox-search-android", version.ref = "mapboxSearch" }
+# Mapbox Java SDK Services (für den klassischen Geocoder aus der Quelle)
+mapbox-java-services = { group = "com.mapbox.mapboxsdk", name = "mapbox-sdk-services", version.ref = "mapboxJava" }
+mapbox-java-geojson = { group = "com.mapbox.mapboxsdk", name = "mapbox-sdk-geojson", version.ref = "mapboxJava" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 
 # Firebase Bibliotheken
