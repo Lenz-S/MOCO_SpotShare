@@ -22,7 +22,7 @@ fun ProfileScreen(onBackClick: () -> Unit) {
     val sharedPrefs = remember { context.getSharedPreferences("moco_prefs", Context.MODE_PRIVATE) }
     
     // Konstante für deinen echten Namen
-    val realName = "Daniela Kucharczyk"
+    val realName = "Max Mustermann"
     
     // Lädt die gespeicherte ID oder nutzt "user_number_one" als Standard
     var userId by remember { 

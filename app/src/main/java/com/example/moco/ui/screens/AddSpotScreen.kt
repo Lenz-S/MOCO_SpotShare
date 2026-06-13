@@ -141,13 +141,19 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
                                         // 1. Schritt: Adresse in Koordinaten umwandeln (Geocoding)
                                         val coords = geocodingHelper.getCoordinatesFromAddress(address)
                                         
-                                        // 2. Schritt: Datenmodell mit generierten und eingegebenen Werten befüllen
+                                        if (coords == null) {
+                                            isSaving = false
+                                            Toast.makeText(context, "Adresse konnte nicht gefunden werden", Toast.LENGTH_LONG).show()
+                                            return@launch
+                                        }
+
+                                        // 2. Schritt: Datenmodell befüllen
                                         val newSpot = ParkingSpot(
                                             title = title,
                                             description = description,
                                             address = address,
-                                            latitude = coords?.first ?: 0.0,
-                                            longitude = coords?.second ?: 0.0,
+                                            latitude = coords.first,
+                                            longitude = coords.second,
                                             ownerId = currentUserId
                                         )
 

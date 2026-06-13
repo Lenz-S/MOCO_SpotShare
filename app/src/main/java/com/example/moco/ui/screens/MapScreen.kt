@@ -1,6 +1,7 @@
 package com.example.moco.ui.screens
 
 import android.Manifest
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -16,40 +17,43 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.moco.data.FirebaseHelper
 import com.example.moco.model.ParkingSpot
 import com.mapbox.geojson.Point
+import com.mapbox.maps.ViewAnnotationAnchor
+import com.mapbox.maps.ViewAnnotationAnchorConfig
 import com.mapbox.maps.extension.compose.MapEffect
 import com.mapbox.maps.extension.compose.MapboxMap
 import com.mapbox.maps.extension.compose.animation.viewport.rememberMapViewportState
+import com.mapbox.maps.extension.compose.annotation.ViewAnnotation
 import com.mapbox.maps.plugin.PuckBearing
-import com.mapbox.maps.plugin.annotation.annotations
-import com.mapbox.maps.plugin.annotation.generated.CircleAnnotationOptions
-import com.mapbox.maps.plugin.annotation.generated.createCircleAnnotationManager
+import com.mapbox.maps.viewannotation.geometry
+import com.mapbox.maps.viewannotation.viewAnnotationOptions
 import com.mapbox.maps.plugin.locationcomponent.createDefault2DPuck
 import com.mapbox.maps.plugin.locationcomponent.location
 import com.mapbox.maps.plugin.viewport.data.FollowPuckViewportStateOptions
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
  * Haupt-Kartenbildschirm der App.
- * Zuständig für Kartenanzeige, Standorterkennung und primäre UI-Interaktionen.
- * 
- * @param onSearchClick Navigation zum Suchbildschirm.
+ * Nutzt Mapbox für die Darstellung und Firebase Firestore für die Daten.
  */
 @Composable
 fun MapScreen(
     onSearchClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val mapViewportState = rememberMapViewportState()
     val scope = rememberCoroutineScope()
     val firebaseHelper = remember { FirebaseHelper() }
     
-    // State für die geladenen Parkplätze
+    // Wir nutzen eine Liste als State. Wenn sich diese ändert, triggert das den MapEffect.
     var parkingSpots by remember { mutableStateOf<List<ParkingSpot>>(emptyList()) }
 
-    // Dialog zur Abfrage der GPS-Berechtigungen (Fine & Coarse Location)
+    // Berechtigungs-Management (Standort)
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -60,7 +64,6 @@ fun MapScreen(
         }
     }
 
-    // Triggert die Standortabfrage beim ersten Start des Screens
     LaunchedEffect(Unit) {
         permissionLauncher.launch(
             arrayOf(
@@ -74,9 +77,9 @@ fun MapScreen(
         MapboxMap(
             modifier = Modifier.fillMaxSize(),
             mapViewportState = mapViewportState,
-            scaleBar = {}, // Deaktiviert die Anzeige des Maßstabs (ScaleBar)
+            scaleBar = {},
         ) {
-            // MapEffect für den Zugriff auf tieferliegende Mapbox-Konfigurationen
+            // Standort-Konfiguration
             MapEffect(Unit) { mapView ->
                 mapView.location.updateSettings {
                     enabled = true
@@ -85,7 +88,6 @@ fun MapScreen(
                     puckBearing = PuckBearing.HEADING
                 }
                 
-                // Kamera auf den Standort ausrichten (Zoom 12.0 für gute Umgebungsübersicht)
                 mapViewportState.transitionToFollowPuckState(
                     followPuckViewportStateOptions = FollowPuckViewportStateOptions.Builder()
                         .zoom(12.0)
@@ -93,31 +95,43 @@ fun MapScreen(
                 )
             }
 
-            // Parkplätze als Pins (rote Kreise) auf der Karte anzeigen
-            // MapEffect reagiert auf Änderungen in parkingSpots
-            MapEffect(parkingSpots) { mapView ->
-                val annotationApi = mapView.annotations
-                val circleAnnotationManager = annotationApi.createCircleAnnotationManager()
+            // NEU: Stabile Darstellung der Parkplätze via ViewAnnotation
+            // Wir nutzen Compose-Elemente direkt als Marker
+            parkingSpots.forEach { spot ->
+                val point = Point.fromLngLat(spot.longitude, spot.latitude)
+                val pinColor = if (spot.isAvailable) Color(0xFF4CAF50) else Color(0xFFF44336)
                 
-                // Bestehende Pins löschen, bevor neue gezeichnet werden
-                circleAnnotationManager.deleteAll()
-                
-                parkingSpots.forEach { spot ->
-                    val circleAnnotationOptions = CircleAnnotationOptions()
-                        .withPoint(Point.fromLngLat(spot.longitude, spot.latitude))
-                        .withCircleRadius(10.0)
-                        .withCircleColor("#E91E63") // Ein schönes Pink/Rot
-                        .withCircleStrokeWidth(2.0)
-                        .withCircleStrokeColor("#FFFFFF")
-                    
-                    circleAnnotationManager.create(circleAnnotationOptions)
+                key(spot.id) {
+                    ViewAnnotation(
+                        options = viewAnnotationOptions {
+                            geometry(point)
+                            allowOverlap(true)
+                            allowOverlapWithPuck(true)
+                            visible(true)
+                            variableAnchors(listOf(
+                                ViewAnnotationAnchorConfig.Builder()
+                                    .anchor(ViewAnnotationAnchor.BOTTOM)
+                                    .build()
+                            ))
+                        }
+                    ) {
+                        // Ein Container für den Pin, um das Rendering zu stabilisieren
+                        Box(modifier = Modifier.wrapContentSize()) {
+                            Icon(
+                                imageVector = Icons.Default.Place,
+                                contentDescription = "Pin",
+                                tint = pinColor,
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .shadow(2.dp, shape = RoundedCornerShape(21.dp))
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        // --- UI Overlays ---
-
-        // Suchbereich (Suchfeld + "In diesem Bereich suchen" Button)
+        // --- UI-Elemente über der Karte ---
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -125,7 +139,7 @@ fun MapScreen(
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Schwebendes Suchfeld (fungiert als Button zum SearchScreen)
+            // Such-Leiste
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -139,59 +153,49 @@ fun MapScreen(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Suche",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Icon(imageVector = Icons.Default.Search, contentDescription = "Suche", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "Adresse suchen...",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text(text = "Adresse suchen...", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Button "In diesem Bereich suchen"
-            // Durchscheinend mit Fokus auf der Schrift
+            // Such-Button
             Button(
                 onClick = {
                     scope.launch {
-                        // Lädt die Parkplätze einmalig aus Firebase
-                        parkingSpots = firebaseHelper.getAllSpotsOnce()
+                        try {
+                            // Daten vom Server abrufen
+                            val spots = firebaseHelper.getAllSpotsOnce()
+                            // Den State aktualisieren - erzwungenes Neuzeichnen durch kurzen Reset
+                            parkingSpots = emptyList() 
+                            delay(50) // Kurze Pause, damit Compose den leeren Zustand bemerkt
+                            parkingSpots = spots
+                            Toast.makeText(context, "${spots.size} Parkplätze geladen", Toast.LENGTH_SHORT).show()
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Fehler: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                        }
                     }
                 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White.copy(alpha = 0.7f),
+                    containerColor = Color.White.copy(alpha = 0.8f),
                     contentColor = MaterialTheme.colorScheme.primary
                 ),
                 shape = RoundedCornerShape(20.dp),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
             ) {
-                Text(
-                    text = "In diesem Bereich suchen",
-                    style = MaterialTheme.typography.labelLarge
-                )
+                Text(text = "In diesem Bereich suchen", style = MaterialTheme.typography.labelLarge)
             }
         }
 
-        // Button zum Neuzentrieren auf den aktuellen Standort
+        // Standort-Button
         FloatingActionButton(
             onClick = { mapViewportState.transitionToFollowPuckState() },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp),
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+            containerColor = MaterialTheme.colorScheme.primaryContainer
         ) {
-            Icon(
-                imageVector = Icons.Default.MyLocation,
-                contentDescription = "Standort fokussieren"
-            )
+            Icon(imageVector = Icons.Default.MyLocation, contentDescription = "Fokus")
         }
     }
 }

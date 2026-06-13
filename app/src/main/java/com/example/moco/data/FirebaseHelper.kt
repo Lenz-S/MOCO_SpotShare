@@ -3,12 +3,11 @@ package com.example.moco.data
 import android.net.Uri
 import com.example.moco.model.ParkingSpot
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Source
 import com.google.firebase.firestore.snapshots
 import com.google.firebase.firestore.toObject
 import com.google.firebase.storage.FirebaseStorage
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
@@ -66,11 +65,23 @@ class FirebaseHelper {
     }
 
     /**
-     * Holt alle Parkplätze einmalig aus der Datenbank.
+     * Holt alle Parkplätze einmalig direkt vom Server.
+     * Nutzt Source.SERVER, um den lokalen Cache zu umgehen.
      */
     suspend fun getAllSpotsOnce(): List<ParkingSpot> {
-        val query = spotsCollection.get().await()
-        return query.toObjects(ParkingSpot::class.java)
+        return try {
+            val query = spotsCollection.get(Source.SERVER).await()
+            val list = mutableListOf<ParkingSpot>()
+            for (doc in query.documents) {
+                val spot = doc.toObject(ParkingSpot::class.java)
+                if (spot != null) {
+                    list.add(spot.copy(id = doc.id))
+                }
+            }
+            list
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
 
     // --- Echtzeit-Streaming (Flows) ---
