@@ -65,6 +65,14 @@ class FirebaseHelper {
         ).await()
     }
 
+    /**
+     * Holt alle Parkplätze einmalig aus der Datenbank.
+     */
+    suspend fun getAllSpotsOnce(): List<ParkingSpot> {
+        val query = spotsCollection.get().await()
+        return query.toObjects(ParkingSpot::class.java)
+    }
+
     // --- Echtzeit-Streaming (Flows) ---
 
     /**
