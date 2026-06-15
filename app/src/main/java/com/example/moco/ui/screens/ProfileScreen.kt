@@ -22,7 +22,7 @@ fun ProfileScreen(onBackClick: () -> Unit) {
     val sharedPrefs = remember { context.getSharedPreferences("moco_prefs", Context.MODE_PRIVATE) }
     
     // Konstante für deinen echten Namen
-    val realName = "Max Mustermann"
+    val realName = "Daniela Kucharczyk"
     
     // Lädt die gespeicherte ID oder nutzt "user_number_one" als Standard
     var userId by remember { 
@@ -83,7 +83,10 @@ fun ProfileScreen(onBackClick: () -> Unit) {
 
             Button(
                 onClick = {
-                    sharedPrefs.edit().putString("user_id", userId).apply()
+                    sharedPrefs.edit()
+                        .putString("user_id", userId)
+                        .putString("real_name", realName)
+                        .apply()
                     // Optional: Feedback für den Nutzer
                 },
                 modifier = Modifier.fillMaxWidth()

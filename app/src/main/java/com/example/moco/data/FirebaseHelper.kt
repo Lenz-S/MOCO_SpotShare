@@ -1,6 +1,7 @@
 package com.example.moco.data
 
 import android.net.Uri
+import com.example.moco.model.Booking
 import com.example.moco.model.ParkingSpot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
@@ -20,6 +21,7 @@ class FirebaseHelper {
     private val firestore = FirebaseFirestore.getInstance()
     private val storage = FirebaseStorage.getInstance()
     private val spotsCollection = firestore.collection("parking_spots")
+    private val bookingsCollection = firestore.collection("bookings")
 
     // --- Speicher-Operationen (Storage) ---
 
@@ -54,14 +56,69 @@ class FirebaseHelper {
 
     /**
      * Startet einen Parkvorgang (Check-In).
+     * Erstellt eine neue Buchung und aktualisiert den Status des Parkplatzes.
      */
-    suspend fun checkIn(spotId: String, tenantId: String) {
-        spotsCollection.document(spotId).update(
+    suspend fun checkIn(spot: ParkingSpot, tenantId: String, tenantName: String, licensePlate: String) {
+        val booking = Booking(
+            spotId = spot.id,
+            spotTitle = spot.title,
+            tenantId = tenantId,
+            tenantName = tenantName,
+            tenantLicensePlate = licensePlate,
+            startTime = System.currentTimeMillis(),
+            isActive = true
+        )
+
+        // 1. Buchung in der bookings-Collection speichern
+        bookingsCollection.document(booking.id).set(booking).await()
+
+        // 2. Parkplatz-Status aktualisieren
+        spotsCollection.document(spot.id).update(
             mapOf(
                 "isAvailable" to false,
-                "currentTenantId" to tenantId
+                "currentTenantId" to tenantId,
+                "currentTenantName" to tenantName,
+                "currentTenantLicensePlate" to licensePlate
             )
         ).await()
+    }
+
+    /**
+     * Beendet einen Parkvorgang (Check-Out).
+     * Aktualisiert die Buchungshistorie und gibt den Parkplatz wieder frei.
+     */
+    suspend fun checkOut(spotId: String, bookingId: String) {
+        // 1. Buchung beenden
+        bookingsCollection.document(bookingId).update(
+            mapOf(
+                "endTime" to System.currentTimeMillis(),
+                "isActive" to false
+            )
+        ).await()
+
+        // 2. Parkplatz freigeben
+        spotsCollection.document(spotId).update(
+            mapOf(
+                "isAvailable" to true,
+                "currentTenantId" to null,
+                "currentTenantName" to null,
+                "currentTenantLicensePlate" to null
+            )
+        ).await()
+    }
+
+    /**
+     * Holt die Buchungshistorie eines Mieters.
+     */
+    suspend fun getBookingHistory(tenantId: String): List<Booking> {
+        return try {
+            val query = bookingsCollection
+                .whereEqualTo("tenantId", tenantId)
+                .get(Source.SERVER).await()
+            query.toObjects(Booking::class.java)
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
 
     /**

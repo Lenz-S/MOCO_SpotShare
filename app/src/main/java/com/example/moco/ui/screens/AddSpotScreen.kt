@@ -47,8 +47,9 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
     var addressError by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
 
-    // Abruf der im Profil hinterlegten Benutzer-ID
+    // Abruf der im Profil hinterlegten Benutzer-ID und des Klarnamens
     val currentUserId = sharedPrefs.getString("user_id", "user_number_one") ?: "user_number_one"
+    val currentUserName = sharedPrefs.getString("real_name", "Daniela Kucharczyk") ?: "Daniela Kucharczyk"
 
     Scaffold(
         topBar = {
@@ -154,7 +155,8 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
                                             address = address,
                                             latitude = coords.first,
                                             longitude = coords.second,
-                                            ownerId = currentUserId
+                                            ownerId = currentUserId,
+                                            ownerName = currentUserName // Speichert den Klarnamen für die Kommunikation
                                         )
 
                                         // 3. Schritt: In der Cloud-Datenbank speichern
