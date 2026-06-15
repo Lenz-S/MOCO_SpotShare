@@ -84,6 +84,25 @@ class FirebaseHelper {
         }
     }
 
+    /**
+     * Holt alle Parkplätze eines bestimmten Besitzers vom Server.
+     */
+    suspend fun getSpotsByOwner(ownerId: String): List<ParkingSpot> {
+        return try {
+            val query = spotsCollection.whereEqualTo("ownerId", ownerId).get(Source.SERVER).await()
+            val list = mutableListOf<ParkingSpot>()
+            for (doc in query.documents) {
+                val spot = doc.toObject(ParkingSpot::class.java)
+                if (spot != null) {
+                    list.add(spot.copy(id = doc.id))
+                }
+            }
+            list
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
     // --- Echtzeit-Streaming (Flows) ---
 
     /**
