@@ -1,27 +1,27 @@
 package com.example.moco.model
 
+import com.google.firebase.firestore.PropertyName
 import java.util.UUID
 
 /**
  * Datenmodell für einen Parkplatz.
- * Dies ist die zentrale Datenstruktur für die Zusammenarbeit im Team.
+ * Optimiert für Firebase und Team-Features.
  */
 data class ParkingSpot(
-    // Eindeutige ID für die Datenbank
     val id: String = UUID.randomUUID().toString(),
-    // Titel des Parkplatzes (z.B. "Garage am Hauptbahnhof")
-    val title: String,
-    // Nähere Beschreibung
+    val title: String = "",
     val description: String = "",
-    // Geografische Koordinaten für Mapbox
-    val latitude: Double,
-    val longitude: Double,
-    // Preis pro Stunde (später für Routing/Buchung wichtig)
-    val pricePerHour: Double = 0.0,
-    // Menschenlesbare Adresse
     val address: String = "",
-    // Verfügbarkeitsstatus
-    val isAvailable: Boolean = true,
-    // ID des Erstellers/Besitzers
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0,
+    val imageUrl: String? = null,
+    val qrCodeData: String? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    
+    @get:PropertyName("isAvailable")
+    @set:PropertyName("isAvailable")
+    var isAvailable: Boolean = true,
+    
+    val currentTenantId: String? = null,
     val ownerId: String = "default_user"
 )
