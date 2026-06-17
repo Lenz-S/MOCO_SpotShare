@@ -1,7 +1,11 @@
 package com.example.moco.ui.screens
 
 import android.content.Context
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -12,26 +16,26 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage // Falls du Coil für die Bildvorschau nutzt (empfohlen)
 import com.example.moco.data.FirebaseHelper
 import com.example.moco.data.GeocodingHelper
 import com.example.moco.model.ParkingSpot
 import kotlinx.coroutines.launch
 
+
 /**
- * AddSpotScreen: Ermöglicht das Anlegen eines neuen Parkplatzes.
- * Dieser Screen integriert Mapbox für das Geocoding und Firebase Firestore für die Speicherung.
- * 
- * @param onBackClick Navigation zurück zur Kartenansicht.
+ * AddSpotScreen: Ermöglicht das Anlegen eines neuen Parkplatzes inklusive Galerie-Upload.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddSpotScreen(onBackClick: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    
+
     // Initialisierung der Daten-Helfer
     val firebaseHelper = remember { FirebaseHelper() }
     val geocodingHelper = remember { GeocodingHelper(context) }
@@ -41,7 +45,10 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
-    
+
+    // NEU: Zustand für das ausgewählte Bild aus der Galerie
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+
     // Zustände für Validierung und Ladevorgang
     var titleError by remember { mutableStateOf(false) }
     var addressError by remember { mutableStateOf(false) }
@@ -49,6 +56,12 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
 
     // Abruf der im Profil hinterlegten Benutzer-ID
     val currentUserId = sharedPrefs.getString("user_id", "user_number_one") ?: "user_number_one"
+
+    // NEU: Photo Picker Launcher für die Galerie
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri -> selectedImageUri = uri }
+    )
 
     Scaffold(
         topBar = {
@@ -94,7 +107,7 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
                 )
 
-                // Eingabefeld für die physische Adresse (wird für Geocoding genutzt)
+                // Eingabefeld für die physische Adresse
                 OutlinedTextField(
                     value = address,
                     onValueChange = {
@@ -126,9 +139,46 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
                 )
 
+                // --- NEU: BILD-SEKTION ---
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (selectedImageUri != null) {
+                            // Vorschau des ausgewählten Bildes (benötigt Coil-Bibliothek)
+                            AsyncImage(
+                                model = selectedImageUri,
+                                contentDescription = "Ausgewähltes Parkplatzfoto",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(180.dp),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                photoPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            },
+                            enabled = !isSaving,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(if (selectedImageUri == null) "Foto aus Galerie wählen" else "Foto ändern")
+                        }
+                    }
+                }
+                // -------------------------
+
                 Spacer(modifier = Modifier.weight(1f))
 
-                // Speicher-Button mit integrierter Geocoding- und Firebase-Logik
+                // Speicher-Button mit integrierter Geocoding-, Firebase- und Upload-Logik
                 Button(
                     onClick = {
                         when {
@@ -138,37 +188,44 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
                                 isSaving = true
                                 scope.launch {
                                     try {
-                                        // 1. Schritt: Adresse in Koordinaten umwandeln (Geocoding)
+                                        // 1. Schritt: Adresse in Koordinaten umwandeln
                                         val coords = geocodingHelper.getCoordinatesFromAddress(address)
-                                        
+
                                         if (coords == null) {
                                             isSaving = false
                                             Toast.makeText(context, "Adresse konnte nicht gefunden werden", Toast.LENGTH_LONG).show()
                                             return@launch
                                         }
 
-                                        // 2. Schritt: Datenmodell befüllen
+                                        // NEU -> 1.5 Schritt: Bild auf Firebase Storage hochladen, falls eines ausgewählt wurde
+                                        var uploadedImageUrl: String? = null
+                                        selectedImageUri?.let { uri ->
+                                            // Hier rufen wir deine Upload-Funktion auf
+                                            uploadedImageUrl = firebaseHelper.uploadImage(uri, context)
+                                        }
+
+                                        // 2. Schritt: Datenmodell befüllen (inklusive der neuen imageUrl)
                                         val newSpot = ParkingSpot(
                                             title = title,
                                             description = description,
                                             address = address,
                                             latitude = coords.first,
                                             longitude = coords.second,
-                                            ownerId = currentUserId
+                                            ownerId = currentUserId,
+                                            imageUrl = uploadedImageUrl // Übergabe der URL an das Modell
                                         )
 
-                                        // 3. Schritt: In der Cloud-Datenbank speichern
+                                        // 3. Schritt: In der Cloud-Datenbank (Firestore) speichern
                                         firebaseHelper.saveParkingSpot(newSpot)
-                                        
+
                                         // Erfolgreich gespeichert -> Zurück zur Karte
                                         isSaving = false
                                         onBackClick()
                                     } catch (e: Exception) {
-                                        // Fehlerbehandlung: UI entsperren und Fehlermeldung anzeigen
                                         isSaving = false
                                         Toast.makeText(
-                                            context, 
-                                            "Fehler: ${e.localizedMessage}", 
+                                            context,
+                                            "Fehler: ${e.localizedMessage}",
                                             Toast.LENGTH_LONG
                                         ).show()
                                     }
@@ -192,8 +249,8 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
                     }
                 }
             }
-            
-            // Graues Overlay während des Speichervorgangs zur visuellen Sperrung
+
+            // Graues Overlay während des Speichervorgangs
             if (isSaving) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),

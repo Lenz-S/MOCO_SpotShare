@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
-
 /**
  * Zentraler Helper für Firebase-Operationen.
  * Erleichtert die Zusammenarbeit im Team durch abstrahierte Methoden für Firestore und Storage.
@@ -32,6 +31,16 @@ class FirebaseHelper {
         val ref = storage.reference.child(fileName)
         ref.putFile(imageUri).await()
         return ref.downloadUrl.await().toString()
+    }
+    suspend fun uploadImage(uri: android.net.Uri, context: android.content.Context): String {
+        val storageRef = FirebaseStorage.getInstance().reference
+            .child("parking_spots/${java.util.UUID.randomUUID()}.jpg")
+
+        val inputStream = context.contentResolver.openInputStream(uri)
+            ?: throw Exception("Datei konnte nicht geöffnet werden")
+
+        storageRef.putStream(inputStream).await()
+        return storageRef.downloadUrl.await().toString()
     }
 
     // --- Datenbank-Operationen (Firestore) ---
