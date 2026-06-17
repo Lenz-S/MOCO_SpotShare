@@ -311,5 +311,20 @@ fun MapScreen(
                 }
             }
         }
+
+        // --- 6. UI-ELEMENT: STANDORT-BUTTON (Zurück zur eigenen Position) ---
+        FloatingActionButton(
+            onClick = { mapViewportState.transitionToFollowPuckState() },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp),
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        ) {
+            Icon(
+                imageVector = Icons.Default.MyLocation,
+                contentDescription = "Standort fokussieren"
+            )
+        }
     }
 }
