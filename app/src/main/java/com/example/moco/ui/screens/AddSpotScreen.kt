@@ -1,6 +1,5 @@
 package com.example.moco.ui.screens
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -29,10 +28,11 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun AddSpotScreen(
     onNavigateBack: () -> Unit,
-    onSaveSpot: (title: String, description: String, pricePerHour: Double) -> Unit
+    onSaveSpot: (title: String, description: String, address: String, pricePerHour: Double) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
+    var address by remember { mutableStateOf("") }
     var pricePerHour by remember { mutableStateOf("") }
     var titleError by remember { mutableStateOf(false) }
 
@@ -43,7 +43,7 @@ fun AddSpotScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Zurück"
                         )
                     }
@@ -91,6 +91,16 @@ fun AddSpotScreen(
             )
 
             OutlinedTextField(
+                value = address,
+                onValueChange = { address = it },
+                label = { Text("Adresse") },
+                placeholder = { Text("Straße, Hausnummer, PLZ, Ort") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+            )
+
+            OutlinedTextField(
                 value = pricePerHour,
                 onValueChange = { input ->
                     if (input.isEmpty() || input.matches(Regex("""^\d*[.,]?\d{0,2}$"""))) {
@@ -115,7 +125,7 @@ fun AddSpotScreen(
                         titleError = true
                     } else {
                         val price = pricePerHour.replace(',', '.').toDoubleOrNull() ?: 0.0
-                        onSaveSpot(title, description, price)
+                        onSaveSpot(title, description, address, price)
                     }
                 },
                 modifier = Modifier
@@ -128,32 +138,3 @@ fun AddSpotScreen(
     }
 }
 
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AddSpotScreen(onBackClick: () -> Unit) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Parkplatz hinzufügen") },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Zurück zur Karte"
-                        )
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(text = "Formular zum Anlegen eines Parkplatzes")
-        }
-    }
-}
