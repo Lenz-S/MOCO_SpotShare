@@ -8,12 +8,17 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.moco.data.FirebaseHelper
 import com.example.moco.data.GeocodingHelper
@@ -22,8 +27,8 @@ import kotlinx.coroutines.launch
 
 /**
  * AddSpotScreen: Ermöglicht das Anlegen eines neuen Parkplatzes.
- * Dieser Screen integriert Mapbox für das Geocoding und Firebase Firestore für die Speicherung.
- * 
+ * Beinhaltet nun auch die Konfiguration der zeitlichen Verfügbarkeit.
+ *
  * @param onBackClick Navigation zurück zur Kartenansicht.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,6 +47,15 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
     var description by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
     
+    // ZUSTAND: Zeitliche Verfügbarkeit
+    val daysOfWeek = listOf("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
+    // Mapping auf Calendar-Konstanten: Mo=2, Di=3, Mi=4, Do=5, Fr=6, Sa=7, So=1
+    val daysMapping = listOf(2, 3, 4, 5, 6, 7, 1)
+    var selectedDays by remember { mutableStateOf(daysMapping.toSet()) }
+    
+    var startTime by remember { mutableStateOf("08:00") }
+    var endTime by remember { mutableStateOf("20:00") }
+
     // Zustände für Validierung und Ladevorgang
     var titleError by remember { mutableStateOf(false) }
     var addressError by remember { mutableStateOf(false) }
@@ -121,34 +135,111 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
                     label = { Text("Beschreibung") },
                     placeholder = { Text("Besonderheiten zur Zufahrt etc.") },
                     minLines = 3,
-                    maxLines = 5,
+                    maxLines = 3,
                     enabled = !isSaving,
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
                 )
 
-                Spacer(modifier = Modifier.weight(1f))
+                // --- NEU: Zeitliche Verfügbarkeit ---
+                Text(
+                    text = "Verfügbarkeit festlegen",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+
+                // Wochentage Auswahl
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Wochentage", style = MaterialTheme.typography.labelLarge)
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            daysOfWeek.forEachIndexed { index, day ->
+                                val dayValue = daysMapping[index]
+                                val isSelected = selectedDays.contains(dayValue)
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = {
+                                        selectedDays = if (isSelected) {
+                                            selectedDays - dayValue
+                                        } else {
+                                            selectedDays + dayValue
+                                        }
+                                    },
+                                    label = { Text(day, style = MaterialTheme.typography.bodySmall) },
+                                    enabled = !isSaving
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Uhrzeiten Auswahl
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    OutlinedTextField(
+                        value = startTime,
+                        onValueChange = { if (it.length <= 5) startTime = it },
+                        label = { Text("Von (HH:mm)") },
+                        placeholder = { Text("08:00") },
+                        modifier = Modifier.weight(1f),
+                        enabled = !isSaving,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        leadingIcon = { Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
+                    OutlinedTextField(
+                        value = endTime,
+                        onValueChange = { if (it.length <= 5) endTime = it },
+                        label = { Text("Bis (HH:mm)") },
+                        placeholder = { Text("20:00") },
+                        modifier = Modifier.weight(1f),
+                        enabled = !isSaving,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        leadingIcon = { Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Speicher-Button mit integrierter Geocoding- und Firebase-Logik
                 Button(
                     onClick = {
+                        val startMin = parseTimeToMinutes(startTime)
+                        val endMin = parseTimeToMinutes(endTime)
+
                         when {
                             title.isBlank() -> titleError = true
                             address.isBlank() -> addressError = true
+                            selectedDays.isEmpty() -> Toast.makeText(context, "Bitte mindestens einen Tag wählen", Toast.LENGTH_SHORT).show()
+                            startMin == null || endMin == null -> Toast.makeText(context, "Ungültiges Zeitformat (HH:mm)", Toast.LENGTH_SHORT).show()
+                            startMin >= endMin -> Toast.makeText(context, "Startzeit muss vor Endzeit liegen", Toast.LENGTH_SHORT).show()
                             else -> {
                                 isSaving = true
                                 scope.launch {
                                     try {
                                         // 1. Schritt: Adresse in Koordinaten umwandeln (Geocoding)
                                         val coords = geocodingHelper.getCoordinatesFromAddress(address)
-                                        
+
                                         if (coords == null) {
                                             isSaving = false
                                             Toast.makeText(context, "Adresse konnte nicht gefunden werden", Toast.LENGTH_LONG).show()
                                             return@launch
                                         }
 
-                                        // 2. Schritt: Datenmodell befüllen
+                                        // 2. Schritt: Datenmodell befüllen mit zeitlicher Verfügbarkeit
                                         val newSpot = ParkingSpot(
                                             title = title,
                                             description = description,
@@ -156,23 +247,22 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
                                             latitude = coords.first,
                                             longitude = coords.second,
                                             ownerId = currentUserId,
-                                            ownerName = currentUserName // Speichert den Klarnamen für die Kommunikation
+                                            ownerName = currentUserName,
+                                            availableDays = selectedDays.toList().sorted(),
+                                            startMinute = startMin,
+                                            endMinute = endMin
                                         )
 
                                         // 3. Schritt: In der Cloud-Datenbank speichern
                                         firebaseHelper.saveParkingSpot(newSpot)
-                                        
+
                                         // Erfolgreich gespeichert -> Zurück zur Karte
                                         isSaving = false
                                         onBackClick()
                                     } catch (e: Exception) {
-                                        // Fehlerbehandlung: UI entsperren und Fehlermeldung anzeigen
+                                        // Fehlerbehandlung
                                         isSaving = false
-                                        Toast.makeText(
-                                            context, 
-                                            "Fehler: ${e.localizedMessage}", 
-                                            Toast.LENGTH_LONG
-                                        ).show()
+                                        Toast.makeText(context, "Fehler: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
                                     }
                                 }
                             }
@@ -203,5 +293,24 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
                 ) {}
             }
         }
+    }
+}
+
+/**
+ * Hilfsfunktion zur Umrechnung von HH:mm in Minuten ab Mitternacht.
+ */
+private fun parseTimeToMinutes(time: String): Int? {
+    return try {
+        val parts = time.split(":")
+        if (parts.size != 2) return null
+        val hours = parts[0].toInt()
+        val minutes = parts[1].toInt()
+        if (hours in 0..23 && minutes in 0..59) {
+            hours * 60 + minutes
+        } else {
+            null
+        }
+    } catch (e: Exception) {
+        null
     }
 }
