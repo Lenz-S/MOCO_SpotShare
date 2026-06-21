@@ -302,7 +302,16 @@ fun MapScreen(
                                 Button(
                                     onClick = {
                                         scope.launch {
+                                            // 1. Check-Out durchführen
                                             spot.activeBookingId?.let { firebaseHelper.checkOut(spot.id, it) }
+
+                                            // 2. Benachrichtigung an den Vermieter senden
+                                            firebaseHelper.sendNotificationRequest(
+                                                targetUserId = spot.ownerId,
+                                                title = "Spot wieder frei!",
+                                                message = "$userName hat die Buchung für '${spot.title}' beendet."
+                                            )
+
                                             showBottomSheet = false
                                         }
                                     },
