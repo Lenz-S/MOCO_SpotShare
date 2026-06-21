@@ -127,6 +127,22 @@ class FirebaseHelper {
     }
 
     /**
+     * Beobachtet Parkplätze eines spezifischen Besitzers in Echtzeit.
+     */
+    fun observeSpotsByOwner(ownerId: String): Flow<List<ParkingSpot>> {
+        return spotsCollection.whereEqualTo("ownerId", ownerId).snapshots().map { querySnapshot ->
+            querySnapshot.toObjects(ParkingSpot::class.java)
+        }
+    }
+
+    /**
+     * Löscht einen Parkplatz aus der Datenbank.
+     */
+    suspend fun deleteParkingSpot(spotId: String) {
+        spotsCollection.document(spotId).delete().await()
+    }
+
+    /**
      * Holt Parkplätze für den MySpotsScreen (Aufgabe für Lenz).
      */
     suspend fun getSpotsByOwner(ownerId: String): List<ParkingSpot> {
