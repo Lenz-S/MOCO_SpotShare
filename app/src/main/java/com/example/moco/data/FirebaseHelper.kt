@@ -1,49 +1,110 @@
 package com.example.moco.data
 
 import android.net.Uri
+import com.example.moco.model.Booking
 import com.example.moco.model.ParkingSpot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
 import com.google.firebase.firestore.snapshots
-import com.google.firebase.firestore.toObject
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import java.io.ByteArrayOutputStream
+
 /**
- * Zentraler Helper für Firebase-Operationen.
- * Erleichtert die Zusammenarbeit im Team durch abstrahierte Methoden für Firestore und Storage.
+ * FirebaseHelper: Zentrale Daten-Schnittstelle der App (Repository-Ersatz).
+ * Kapselt alle asynchronen Operationen für Firestore und Storage.
  */
 class FirebaseHelper {
     private val firestore = FirebaseFirestore.getInstance()
     private val storage = FirebaseStorage.getInstance()
     private val spotsCollection = firestore.collection("parking_spots")
-
-    // --- Speicher-Operationen (Storage) ---
+    private val bookingsCollection = firestore.collection("bookings")
+    private val notificationsCollection = firestore.collection("notifications")
 
     /**
-     * Lädt ein Bild asynchron hoch und gibt die Download-URL zurück.
-     * Unterstützt den Anwendungsfall "Visuelle Stellplatz-Dokumentation".
+     * Sendet eine Benachrichtigungs-Anfrage an Firestore.
+     * Ein Listener in der App des Empfängers wird diese bemerken und lokal anzeigen.
      */
-    suspend fun uploadSpotImage(imageUri: Uri): String {
-        val fileName = "spots/${UUID.randomUUID()}.jpg"
-        val ref = storage.reference.child(fileName)
-        ref.putFile(imageUri).await()
-        return ref.downloadUrl.await().toString()
+    suspend fun sendNotificationRequest(targetUserId: String, title: String, message: String) {
+        val notificationData = mapOf(
+            "id" to UUID.randomUUID().toString(),
+            "targetUserId" to targetUserId,
+            "title" to title,
+            "message" to message,
+            "timestamp" to System.currentTimeMillis(),
+            "isRead" to false
+        )
+        notificationsCollection.document(notificationData["id"] as String).set(notificationData).await()
     }
-    suspend fun uploadImage(uri: android.net.Uri, context: android.content.Context): String {
-        val storageRef = FirebaseStorage.getInstance().reference
-            .child("parking_spots/${java.util.UUID.randomUUID()}.jpg")
 
-        val inputStream = context.contentResolver.openInputStream(uri)
-            ?: throw Exception("Datei konnte nicht geöffnet werden")
+    /**
+     * Beobachtet eingehende Benachrichtigungen für einen spezifischen Nutzer.
+     */
+    fun observeNotifications(userId: String): Flow<List<Map<String, Any>>> {
+        return notificationsCollection
+            .whereEqualTo("targetUserId", userId)
+            .whereEqualTo("isRead", false)
+            .snapshots()
+            .map { it.documents.map { doc -> doc.data ?: emptyMap() } }
+    }
 
-        storageRef.putStream(inputStream).await()
+    /**
+     * Markiert eine Benachrichtigung als gelesen, damit sie nicht doppelt angezeigt wird.
+     */
+    suspend fun markNotificationAsRead(notificationId: String) {
+        notificationsCollection.document(notificationId).update("isRead", true).await()
+    }
+
+    /**
+     * Speichert das Push-Token eines Nutzers in Firestore.
+     * Dies ermöglicht es dem Server (oder anderen Clients), gezielt Nachrichten an diesen Nutzer zu senden.
+     */
+    suspend fun updatePushToken(userId: String, token: String) {
+        firestore.collection("users").document(userId).set(
+            mapOf("fcmToken" to token),
+            com.google.firebase.firestore.SetOptions.merge()
+        ).await()
+    }
+
+    suspend fun uploadSpotImageCompressed(context: Context, imageUri: Uri, spotId: String): String {
+        val storageRef = storage.reference.child("spots/$spotId.jpg")
+
+        // 1. Bild lokal komprimieren, um Datenvolumen und Speicherplatz zu sparen
+        val inputStream = context.contentResolver.openInputStream(imageUri)
+        val originalBitmap = BitmapFactory.decodeStream(inputStream)
+
+        // Skalieren (z.B. maximale Breite/Höhe von 1024 Pixeln beibehalten)
+        val maxSize = 1024
+        val width = originalBitmap.width
+        val height = originalBitmap.height
+        val bitmap = if (width > maxSize || height > maxSize) {
+            val ratio = width.toFloat() / height.toFloat()
+            val newWidth = if (ratio > 1) maxSize else (maxSize * ratio).toInt()
+            val newHeight = if (ratio > 1) (maxSize / ratio).toInt() else maxSize
+            Bitmap.createScaledBitmap(originalBitmap, newWidth, newHeight, true)
+        } else {
+            originalBitmap
+        }
+
+        // In ein Byte-Array mit 80% JPEG-Qualität schreiben
+        val baos = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 80, baos)
+        val imageData = baos.toByteArray()
+
+        // 2. Upload der komprimierten Bytes statt der riesigen Originaldatei
+        storageRef.putBytes(imageData).await()
+
+        // 3. Download-URL für Firestore zurückgeben
         return storageRef.downloadUrl.await().toString()
     }
 
-    // --- Datenbank-Operationen (Firestore) ---
+    // --- NEBENLÄUFIGKEIT: ASYNCHRONE SCHREIBZUGRIFFE (Deine Aufgabe) ---
 
     /**
      * Erstellt oder aktualisiert einen Parkplatz in der Datenbank.
@@ -53,24 +114,77 @@ class FirebaseHelper {
     }
 
     /**
-     * Validiert einen QR-Code-String gegen die Datenbank.
-     * Unterstützt den Anwendungsfall "QR-basierter Echtzeit-Check-In".
+     * Führt einen Check-In durch.
+     * Nutzt zwei Collections parallel, um Daten-Konsistenz zu wahren.
      */
-    suspend fun findSpotByQrCode(qrData: String): ParkingSpot? {
-        val query = spotsCollection.whereEqualTo("qrCodeData", qrData).limit(1).get().await()
-        return query.documents.firstOrNull()?.toObject<ParkingSpot>()
+    suspend fun checkIn(spot: ParkingSpot, tenantId: String, tenantName: String, licensePlate: String) {
+        val booking = Booking(
+            spotId = spot.id,
+            spotTitle = spot.title,
+            tenantId = tenantId,
+            tenantName = tenantName,
+            tenantLicensePlate = licensePlate,
+            startTime = System.currentTimeMillis()
+        )
+
+        // Speichert die Buchungshistorie
+        bookingsCollection.document(booking.id).set(booking).await()
+
+        // Aktualisiert den Live-Status des Parkplatzes
+        spotsCollection.document(spot.id).update(
+            mapOf(
+                "isAvailable" to false,
+                "currentTenantId" to tenantId,
+                "currentTenantName" to tenantName,
+                "currentTenantLicensePlate" to licensePlate,
+                "activeBookingId" to booking.id
+            )
+        ).await()
     }
 
     /**
-     * Startet einen Parkvorgang (Check-In).
+     * Gibt einen Parkplatz wieder frei.
      */
-    suspend fun checkIn(spotId: String, tenantId: String) {
+    suspend fun checkOut(spotId: String, bookingId: String) {
+        bookingsCollection.document(bookingId).update(
+            mapOf("endTime" to System.currentTimeMillis(), "isActive" to false)
+        ).await()
+
         spotsCollection.document(spotId).update(
             mapOf(
-                "isAvailable" to false,
-                "currentTenantId" to tenantId
+                "isAvailable" to true,
+                "currentTenantId" to null,
+                "currentTenantName" to null,
+                "currentTenantLicensePlate" to null,
+                "activeBookingId" to null
             )
         ).await()
+    }
+
+    /**
+     * Holt die Buchungshistorie eines Mieters.
+     */
+    suspend fun getBookingHistory(tenantId: String): List<Booking> {
+        return try {
+            val query = bookingsCollection
+                .whereEqualTo("tenantId", tenantId)
+                .get(Source.SERVER).await()
+            query.toObjects(Booking::class.java)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    // --- NEBENLÄUFIGKEIT: ECHTZEIT-DATENSTRÖME (FLOWS) ---
+
+    /**
+     * Beobachtet alle Parkplätze.
+     * Jedes Mal, wenn ein anderer Nutzer etwas ändert, "fließt" ein neues Ergebnis in die UI.
+     */
+    fun observeAllSpots(): Flow<List<ParkingSpot>> {
+        return spotsCollection.snapshots().map { querySnapshot ->
+            querySnapshot.toObjects(ParkingSpot::class.java)
+        }
     }
 
     /**
@@ -80,51 +194,38 @@ class FirebaseHelper {
     suspend fun getAllSpotsOnce(): List<ParkingSpot> {
         return try {
             val query = spotsCollection.get(Source.SERVER).await()
-            val list = mutableListOf<ParkingSpot>()
-            for (doc in query.documents) {
-                val spot = doc.toObject(ParkingSpot::class.java)
-                if (spot != null) {
-                    list.add(spot.copy(id = doc.id))
-                }
-            }
-            list
+            query.toObjects(ParkingSpot::class.java)
         } catch (e: Exception) {
             emptyList()
         }
     }
 
-    // --- Echtzeit-Streaming (Flows) ---
-
     /**
-     * Beobachtet einen spezifischen Parkplatz auf Statusänderungen.
-     * Unterstützt den Anwendungsfall "Favoriten-Verfügbarkeits-Wächter".
+     * Beobachtet Parkplätze eines spezifischen Besitzers in Echtzeit.
      */
-    fun observeSpotStatus(spotId: String): Flow<ParkingSpot?> {
-        return spotsCollection.document(spotId).snapshots().map { snapshot ->
-            snapshot.toObject<ParkingSpot>()
-        }
-    }
-
-    /**
-     * Beobachtet alle neuen Parkplätze in Echtzeit.
-     * Unterstützt den Anwendungsfall "Regionaler Parkplatz-Radar".
-     * (Hinweis: Für echtes Geo-Fencing kann dies später mit GeoFirestore erweitert werden).
-     */
-    fun observeAllSpots(): Flow<List<ParkingSpot>> {
-        return spotsCollection.snapshots().map { querySnapshot ->
+    fun observeSpotsByOwner(ownerId: String): Flow<List<ParkingSpot>> {
+        return spotsCollection.whereEqualTo("ownerId", ownerId).snapshots().map { querySnapshot ->
             querySnapshot.toObjects(ParkingSpot::class.java)
         }
     }
 
     /**
-     * Beobachtet Buchungen für einen bestimmten Vermieter.
-     * Unterstützt den Anwendungsfall "Echtzeit-Vermieter-Info".
+     * Löscht einen Parkplatz aus der Datenbank.
      */
-    fun observeMySpotsBookings(ownerId: String): Flow<List<ParkingSpot>> {
-        return spotsCollection
-            .whereEqualTo("ownerId", ownerId)
-            .whereEqualTo("isAvailable", false)
-            .snapshots()
-            .map { it.toObjects(ParkingSpot::class.java) }
+    suspend fun deleteParkingSpot(spotId: String) {
+        spotsCollection.document(spotId).delete().await()
     }
+
+    /**
+     * Holt Parkplätze für die Übersicht der eigenen Spots.
+     */
+    suspend fun getSpotsByOwner(ownerId: String): List<ParkingSpot> {
+        return try {
+            val query = spotsCollection.whereEqualTo("ownerId", ownerId).get(Source.SERVER).await()
+            query.toObjects(ParkingSpot::class.java)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
 }

@@ -2,6 +2,7 @@ package com.example.moco.data
 
 import android.content.Context
 import com.example.moco.R
+import com.mapbox.api.geocoding.v5.GeocodingCriteria
 import com.mapbox.api.geocoding.v5.MapboxGeocoding
 import com.mapbox.api.geocoding.v5.models.GeocodingResponse
 import retrofit2.Call
@@ -19,7 +20,7 @@ class GeocodingHelper(private val context: Context) {
     /**
      * Wandelt eine Adresse in Koordinaten um.
      * Nutzt Coroutines (suspend), um das Ergebnis asynchron zurückzugeben.
-     * 
+     *
      * @param address Die vom Nutzer eingegebene Adresse.
      * @return Ein Pair aus Latitude und Longitude oder null bei Fehler.
      */
@@ -27,6 +28,9 @@ class GeocodingHelper(private val context: Context) {
         val mapboxGeocoding = MapboxGeocoding.builder()
             .accessToken(context.getString(R.string.mapbox_access_token))
             .query(address)
+            .country("DE") // Suche auf Deutschland begrenzen
+            .languages("de") // Deutsche Sprache bevorzugen
+            .geocodingTypes(GeocodingCriteria.TYPE_ADDRESS, GeocodingCriteria.TYPE_POI)
             .limit(1)
             .build()
 
