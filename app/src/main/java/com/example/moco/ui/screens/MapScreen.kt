@@ -61,8 +61,8 @@ fun MapScreen(
     val sharedPrefs = remember { context.getSharedPreferences("moco_prefs", android.content.Context.MODE_PRIVATE) }
     
     // Aktuelle Benutzerinfos
-    val userId = sharedPrefs.getString("user_id", "user_number_one") ?: "user_number_one"
-    val userName = sharedPrefs.getString("real_name", "Daniela Kucharczyk") ?: "Daniela Kucharczyk"
+    val userId = sharedPrefs.getString("user_id", "user_default") ?: "user_default"
+    val userName = sharedPrefs.getString("real_name", "Benutzer") ?: "Benutzer"
     val userLicensePlate = sharedPrefs.getString("license_plate", "K-XY 123") ?: "K-XY 123"
 
     // NEBENLÄUFIGKEIT: Beobachtet den Echtzeit-Datenstrom von Firebase
@@ -282,7 +282,16 @@ fun MapScreen(
                                 Button(
                                     onClick = {
                                         scope.launch {
+                                            // 1. Check-In durchführen
                                             firebaseHelper.checkIn(spot, userId, userName, userLicensePlate)
+                                            
+                                            // 2. Benachrichtigung an den Vermieter senden
+                                            firebaseHelper.sendNotificationRequest(
+                                                targetUserId = spot.ownerId,
+                                                title = "Neuer Mieter!",
+                                                message = "$userName hat gerade auf deinem Spot '${spot.title}' eingecheckt."
+                                            )
+
                                             showBottomSheet = false
                                         }
                                     },

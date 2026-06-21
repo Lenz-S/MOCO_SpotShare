@@ -21,8 +21,54 @@ class FirebaseHelper {
     private val storage = FirebaseStorage.getInstance()
     private val spotsCollection = firestore.collection("parking_spots")
     private val bookingsCollection = firestore.collection("bookings")
+    private val notificationsCollection = firestore.collection("notifications")
 
-    // --- NEBENLÄUFIGKEIT: ASYNCHRONE MEDIA-UPLOAD-FUNKTION (Aufgabe für Nils) ---
+    /**
+     * Sendet eine Benachrichtigungs-Anfrage an Firestore.
+     * Ein Listener in der App des Empfängers wird diese bemerken und lokal anzeigen.
+     */
+    suspend fun sendNotificationRequest(targetUserId: String, title: String, message: String) {
+        val notificationData = mapOf(
+            "id" to UUID.randomUUID().toString(),
+            "targetUserId" to targetUserId,
+            "title" to title,
+            "message" to message,
+            "timestamp" to System.currentTimeMillis(),
+            "isRead" to false
+        )
+        notificationsCollection.document(notificationData["id"] as String).set(notificationData).await()
+    }
+
+    /**
+     * Beobachtet eingehende Benachrichtigungen für einen spezifischen Nutzer.
+     */
+    fun observeNotifications(userId: String): Flow<List<Map<String, Any>>> {
+        return notificationsCollection
+            .whereEqualTo("targetUserId", userId)
+            .whereEqualTo("isRead", false)
+            .snapshots()
+            .map { it.documents.map { doc -> doc.data ?: emptyMap() } }
+    }
+
+    /**
+     * Markiert eine Benachrichtigung als gelesen, damit sie nicht doppelt angezeigt wird.
+     */
+    suspend fun markNotificationAsRead(notificationId: String) {
+        notificationsCollection.document(notificationId).update("isRead", true).await()
+    }
+
+    /**
+     * Speichert das Push-Token eines Nutzers in Firestore.
+     * Dies ermöglicht es dem Server (oder anderen Clients), gezielt Nachrichten an diesen Nutzer zu senden.
+     */
+    suspend fun updatePushToken(userId: String, token: String) {
+        firestore.collection("users").document(userId).set(
+            mapOf("fcmToken" to token),
+            com.google.firebase.firestore.SetOptions.merge()
+        ).await()
+    }
+
+    // --- NEBENLÄUFIGKEIT: ASYNCHRONE MEDIA-UPLOAD-FUNKTION ---
     suspend fun uploadSpotImage(imageUri: Uri): String {
         val fileName = "spots/${UUID.randomUUID()}.jpg"
         val ref = storage.reference.child(fileName)
@@ -143,7 +189,7 @@ class FirebaseHelper {
     }
 
     /**
-     * Holt Parkplätze für den MySpotsScreen (Aufgabe für Lenz).
+     * Holt Parkplätze für die Übersicht der eigenen Spots.
      */
     suspend fun getSpotsByOwner(ownerId: String): List<ParkingSpot> {
         return try {

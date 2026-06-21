@@ -16,7 +16,7 @@ data class ParkingSpot(
     // Eindeutige Kennung (Wird automatisch generiert)
     val id: String = UUID.randomUUID().toString(),
     
-    // Basis-Informationen (Eingabe durch Nils im AddSpotScreen)
+    // Basis-Informationen
     val title: String = "",
     val description: String = "",
     val address: String = "",
