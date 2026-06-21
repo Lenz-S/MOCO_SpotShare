@@ -11,6 +11,7 @@ composeBom = "2026.06.00"
 # Aktuelle Mapbox Version für Android
 mapboxCompose = "11.24.2"
 navigationCompose = "2.9.8"
+firebaseBom = "33.1.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -34,8 +35,11 @@ mapbox-compose = { group = "com.mapbox.extension", name = "maps-compose-ndk27", 
 # Mapbox Core SDK - Wird benötigt für Klassen wie CameraState
 mapbox-maps = { group = "com.mapbox.maps", name = "android-ndk27", version.ref = "mapboxCompose" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-
+google-services = { id = "com.google.gms.google-services", version = "4.4.2" }
