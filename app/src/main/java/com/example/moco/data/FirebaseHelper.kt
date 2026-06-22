@@ -76,7 +76,7 @@ class FirebaseHelper {
         return ref.downloadUrl.await().toString()
     }
 
-    // --- NEBENLÄUFIGKEIT: ASYNCHRONE SCHREIBZUGRIFFE (Deine Aufgabe) ---
+    // --- NEBENLÄUFIGKEIT: ASYNCHRONE SCHREIBZUGRIFFE  ---
 
     /**
      * Erstellt oder aktualisiert einen Parkplatz in der Datenbank.
