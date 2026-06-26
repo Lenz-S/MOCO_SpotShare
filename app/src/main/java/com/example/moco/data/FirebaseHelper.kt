@@ -14,7 +14,10 @@ import java.util.UUID
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.core.graphics.scale
 import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * FirebaseHelper: Zentrale Daten-Schnittstelle der App (Repository-Ersatz).
@@ -72,14 +75,19 @@ class FirebaseHelper {
         ).await()
     }
 
-    suspend fun uploadSpotImageCompressed(context: Context, imageUri: Uri, spotId: String): String {
+    suspend fun uploadSpotImageCompressed(context: Context, imageUri: Uri, spotId: String): String = withContext(Dispatchers.IO) {
         val storageRef = storage.reference.child("spots/$spotId.jpg")
 
-        // 1. Bild lokal komprimieren, um Datenvolumen und Speicherplatz zu sparen
+        // 1. Bild lokal komprimieren
         val inputStream = context.contentResolver.openInputStream(imageUri)
+            ?: throw Exception("Bild konnte nicht geladen werden")
+        
         val originalBitmap = BitmapFactory.decodeStream(inputStream)
+            ?: throw Exception("Bildformat wird nicht unterstützt")
+        
+        inputStream.close()
 
-        // Skalieren (z.B. maximale Breite/Höhe von 1024 Pixeln beibehalten)
+        // Skalieren (maximale Breite/Höhe von 1024 Pixeln)
         val maxSize = 1024
         val width = originalBitmap.width
         val height = originalBitmap.height
@@ -87,7 +95,7 @@ class FirebaseHelper {
             val ratio = width.toFloat() / height.toFloat()
             val newWidth = if (ratio > 1) maxSize else (maxSize * ratio).toInt()
             val newHeight = if (ratio > 1) (maxSize / ratio).toInt() else maxSize
-            Bitmap.createScaledBitmap(originalBitmap, newWidth, newHeight, true)
+            originalBitmap.scale(newWidth, newHeight, true)
         } else {
             originalBitmap
         }
@@ -96,12 +104,19 @@ class FirebaseHelper {
         val baos = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.JPEG, 80, baos)
         val imageData = baos.toByteArray()
+        
+        // Speicher freigeben
+        if (bitmap != originalBitmap) bitmap.recycle()
+        originalBitmap.recycle()
 
-        // 2. Upload der komprimierten Bytes statt der riesigen Originaldatei
-        storageRef.putBytes(imageData).await()
-
-        // 3. Download-URL für Firestore zurückgeben
-        return storageRef.downloadUrl.await().toString()
+        // 2. Upload der komprimierten Bytes
+        val uploadTask = storageRef.putBytes(imageData)
+        
+        // Warte bis der Upload fertig ist
+        uploadTask.await()
+        
+        // Hole die URL ab
+        storageRef.downloadUrl.await().toString()
     }
 
     // --- NEBENLÄUFIGKEIT: ASYNCHRONE SCHREIBZUGRIFFE (Deine Aufgabe) ---
@@ -111,6 +126,47 @@ class FirebaseHelper {
      */
     suspend fun saveParkingSpot(spot: ParkingSpot) {
         spotsCollection.document(spot.id).set(spot).await()
+    }
+
+    /**
+     * Convenience: Erstellt ein ParkingSpot-Objekt, lädt optional ein Bild hoch und speichert alles in Firestore.
+     */
+    suspend fun createAndSaveParkingSpot(
+        context: Context,
+        imageUri: Uri?,
+        title: String,
+        description: String,
+        address: String,
+        latitude: Double,
+        longitude: Double,
+        ownerId: String,
+        ownerName: String,
+        availableDays: List<Int>,
+        startMinute: Int,
+        endMinute: Int
+    ) {
+        val spotId = UUID.randomUUID().toString()
+        var uploadedUrl: String? = null
+        imageUri?.let { uri ->
+            uploadedUrl = uploadSpotImageCompressed(context, uri, spotId)
+        }
+
+        val spot = ParkingSpot(
+            id = spotId,
+            title = title,
+            description = description,
+            address = address,
+            latitude = latitude,
+            longitude = longitude,
+            imageUrl = uploadedUrl,
+            availableDays = availableDays,
+            startMinute = startMinute,
+            endMinute = endMinute,
+            ownerId = ownerId,
+            ownerName = ownerName
+        )
+
+        saveParkingSpot(spot)
     }
 
     /**

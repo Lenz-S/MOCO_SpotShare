@@ -3,7 +3,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.google.services) apply false
+    alias(libs.plugins.google.services)
 }
 
 // Lädt die local.properties für den Zugriff auf den Access Token
@@ -15,8 +15,8 @@ if (localPropertiesFile.exists()) {
 
 android {
     namespace = "com.example.moco"
-    // Erhöht auf 36, da neuere androidx-Abhängigkeiten dies zwingend erfordern
-    compileSdk = 36
+    // Erhöht auf 37, da neuere androidx-Abhängigkeiten dies zwingend erfordern
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.example.moco"
@@ -65,7 +65,9 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
-    
+    // Image loading with Coil for Jetpack Compose (AsyncImage)
+    implementation("io.coil-kt:coil-compose:2.4.0")
+
     // Hinzufügen der Mapbox Compose Library
     implementation(libs.mapbox.compose)
     // maps-android wird zwingend für Kamera-Zustände und Basis-Klassen benötigt
@@ -75,7 +77,16 @@ dependencies {
     implementation("com.mapbox.search:mapbox-search-android:2.1.0") {
         exclude(group = "com.mapbox.common", module = "common")
     }
-    
+
+    // (Mapbox-Geocoding war zuvor verwendet; wir nutzen Android Geocoder stattdessen — kein zusätzlicher Mapbox-Client nötig)
+
+    // Firebase Firestore / Storage (Versionen werden vom Firebase BOM gesteuert)
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-storage")
+
+    // Coroutine integration for Task await() helpers
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+
     // Navigation Library für den Wechsel zwischen den Screens
     implementation(libs.androidx.navigation.compose)
     

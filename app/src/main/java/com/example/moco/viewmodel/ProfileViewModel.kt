@@ -13,16 +13,16 @@ import androidx.lifecycle.AndroidViewModel
  * auch beim Drehen des Bildschirms erhalten.
  */
 class ProfileViewModel(application: Application) : AndroidViewModel(application) {
-    
+
     private val sharedPrefs = application.getSharedPreferences("moco_prefs", Context.MODE_PRIVATE)
 
     // UI-Zustand (State): Diese Variablen werden von der View (ProfileScreen) beobachtet.
     var realName by mutableStateOf(sharedPrefs.getString("real_name", "Benutzer") ?: "Benutzer")
         private set
-    
+
     var userId by mutableStateOf(sharedPrefs.getString("user_id", "user_default") ?: "user_default")
         private set
-    
+
     var licensePlate by mutableStateOf(sharedPrefs.getString("license_plate", "K-XY 123") ?: "K-XY 123")
         private set
 

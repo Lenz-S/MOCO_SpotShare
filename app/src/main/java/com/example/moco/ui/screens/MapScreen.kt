@@ -35,7 +35,7 @@ import com.mapbox.maps.plugin.viewport.data.FollowPuckViewportStateOptions
  * 4. Interaktive Elemente über der Karte (z.B. Standort-Button).
  */
 @Composable
-fun MapScreen() {
+fun MapScreen(onSearchClick: () -> Unit) {
     // mapViewportState verwaltet den sichtbaren Bereich der Karte (Kamera).
     // rememberMapViewportState stellt sicher, dass der Zustand bei UI-Updates erhalten bleibt.
     val mapViewportState = rememberMapViewportState()
@@ -88,11 +88,12 @@ fun MapScreen() {
                 // Wir setzen hier einen festen Zoom-Wert von 15.0 für eine gute Übersicht der Umgebung.
                 mapViewportState.transitionToFollowPuckState(
                     followPuckViewportStateOptions = FollowPuckViewportStateOptions.Builder()
-                        .zoom(12.0)
+                        .zoom(15.0)
                         .build()
                 )
             }
         }
+
 
         // --- UI Elemente über der Karte ---
 
