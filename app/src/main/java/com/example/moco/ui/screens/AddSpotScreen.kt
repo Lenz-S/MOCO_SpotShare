@@ -1,11 +1,12 @@
 package com.example.moco.ui.screens
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import coil.compose.rememberAsyncImagePainter
 import com.example.moco.data.FirebaseHelper
@@ -42,78 +44,82 @@ import com.example.moco.model.ParkingSpot
 import kotlinx.coroutines.launch
 import java.io.File
 
-/**
- * AddSpotScreen: Ermöglicht das Anlegen eines neuen Parkplatzes inklusive zeitlicher Verfügbarkeit und Foto.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddSpotScreen(onBackClick: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     
-    // Initialisierung der Daten-Helfer
     val firebaseHelper = remember { FirebaseHelper() }
     val geocodingHelper = remember { GeocodingHelper(context) }
     val imageHelper = remember { ImageHelper(context) }
     val sharedPrefs = remember { context.getSharedPreferences("moco_prefs", Context.MODE_PRIVATE) }
 
-    // Zustandsvariablen für die Formulareingaben
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
-    
-    // --- ZUSTAND: Foto ---
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    
+    // Vorbereitung der Datei für das Kamerabild
     val tempImageUri = remember {
-        val file = File(context.cacheDir, "temp_image.jpg")
+        val directory = File(context.cacheDir, "images")
+        if (!directory.exists()) directory.mkdirs()
+        val file = File(directory, "temp_image.jpg")
         FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
     }
 
-    // Launcher für Galerie
-    val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) {
-            selectedImageUri = uri
-        }
-    }
-
     // Launcher für Kamera
-    val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture()
-    ) { success ->
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         if (success) {
             selectedImageUri = tempImageUri
         }
     }
 
-    // ZUSTAND: Zeitliche Verfügbarkeit
+    // Hilfsfunktion zum Starten der Kamera
+    val launchCamera = {
+        try {
+            val file = File(context.cacheDir, "images/temp_image.jpg")
+            if (!file.exists()) {
+                file.parentFile?.mkdirs()
+                file.createNewFile()
+            }
+            cameraLauncher.launch(tempImageUri)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Kamera-Fehler: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    // Launcher für Galerie
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) selectedImageUri = uri
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+        if (isGranted) launchCamera()
+        else Toast.makeText(context, "Kamera-Berechtigung wird benötigt", Toast.LENGTH_SHORT).show()
+    }
+
+    // Zeit-Zustände
     val daysOfWeek = listOf("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
     val daysMapping = listOf(2, 3, 4, 5, 6, 7, 1)
     var selectedDays by remember { mutableStateOf(daysMapping.toSet()) }
-    
     var startTime by remember { mutableStateOf("08:00") }
     var endTime by remember { mutableStateOf("20:00") }
 
-    // Zustände für Validierung und Ladevorgang
     var titleError by remember { mutableStateOf(false) }
     var addressError by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
 
-    // Abruf der im Profil hinterlegten Benutzer-ID und des Klarnamens
     val currentUserId = sharedPrefs.getString("user_id", "user_default") ?: "user_default"
     val currentUserName = sharedPrefs.getString("real_name", "Benutzer") ?: "Benutzer"
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Neuen Parkplatz hinzufügen") },
+                title = { Text("Parkplatz anbieten") },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick, enabled = !isSaving) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Zurück"
-                        )
+                    IconButton(onClick = onBackClick) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
                     }
                 }
             )
@@ -128,12 +134,7 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // --- NEU: Foto-Sektion ---
-                Text(
-                    text = "Foto hinzufügen (Optional)",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                Text(text = "Foto hinzufügen", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 
                 Box(
                     modifier = Modifier
@@ -141,219 +142,96 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
                         .height(200.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
-                        .clickable {
-                            // Dialog oder BottomSheet zur Auswahl wäre schöner, 
-                            // hier erst mal direkt Buttons darunter.
-                        },
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     if (selectedImageUri != null) {
                         Image(
                             painter = rememberAsyncImagePainter(selectedImageUri),
-                            contentDescription = "Ausgewähltes Bild",
+                            contentDescription = null,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
                         )
                     } else {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Default.AddAPhoto,
-                                contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                "Noch kein Foto ausgewählt",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        Icon(Icons.Default.AddAPhoto, contentDescription = null, modifier = Modifier.size(48.dp), tint = Color.Gray)
                     }
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = { cameraLauncher.launch(tempImageUri) },
-                        modifier = Modifier.weight(1f),
-                        enabled = !isSaving
-                    ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = {
+                        val permissionCheck = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
+                        if (permissionCheck == PackageManager.PERMISSION_GRANTED) launchCamera()
+                        else permissionLauncher.launch(Manifest.permission.CAMERA)
+                    }, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.AddAPhoto, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
                         Text("Kamera")
                     }
-                    OutlinedButton(
-                        onClick = { galleryLauncher.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                        modifier = Modifier.weight(1f),
-                        enabled = !isSaving
-                    ) {
+                    OutlinedButton(onClick = { galleryLauncher.launch("image/*") }, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.PhotoLibrary, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
                         Text("Galerie")
                     }
                 }
 
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-                // Eingabefeld für den Parkplatz-Namen
                 OutlinedTextField(
                     value = title,
-                    onValueChange = {
-                        title = it
-                        if (it.isNotBlank()) titleError = false
-                    },
-                    label = { Text("Titel / Name") },
-                    placeholder = { Text("z.B. Garage am Park") },
+                    onValueChange = { title = it; titleError = false },
+                    label = { Text("Titel") },
                     isError = titleError,
-                    supportingText = {
-                        if (titleError) Text("Bitte gib einen Titel an", color = MaterialTheme.colorScheme.error)
-                    },
-                    singleLine = true,
-                    enabled = !isSaving,
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+                    modifier = Modifier.fillMaxWidth()
                 )
 
-                // Eingabefeld für die physische Adresse (wird für Geocoding genutzt)
                 OutlinedTextField(
                     value = address,
-                    onValueChange = {
-                        address = it
-                        if (it.isNotBlank()) addressError = false
-                    },
+                    onValueChange = { address = it; addressError = false },
                     label = { Text("Adresse") },
-                    placeholder = { Text("Straße, PLZ, Ort") },
                     isError = addressError,
-                    supportingText = {
-                        if (addressError) Text("Die Adresse ist erforderlich", color = MaterialTheme.colorScheme.error)
-                    },
-                    singleLine = true,
-                    enabled = !isSaving,
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+                    modifier = Modifier.fillMaxWidth()
                 )
 
-                // Eingabefeld für zusätzliche Details
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
                     label = { Text("Beschreibung") },
-                    placeholder = { Text("Besonderheiten zur Zufahrt etc.") },
                     minLines = 3,
-                    maxLines = 3,
-                    enabled = !isSaving,
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
+                    modifier = Modifier.fillMaxWidth()
                 )
 
-                // --- NEU: Zeitliche Verfügbarkeit ---
-                Text(
-                    text = "Verfügbarkeit festlegen",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
+                Text(text = "Verfügbarkeit", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 
-                // Wochentage Auswahl
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Wochentage", style = MaterialTheme.typography.labelLarge)
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            daysOfWeek.forEachIndexed { index, day ->
-                                val dayValue = daysMapping[index]
-                                val isSelected = selectedDays.contains(dayValue)
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = {
-                                        selectedDays = if (isSelected) {
-                                            selectedDays - dayValue
-                                        } else {
-                                            selectedDays + dayValue
-                                        }
-                                    },
-                                    label = { Text(day, style = MaterialTheme.typography.bodySmall) },
-                                    enabled = !isSaving
-                                )
-                            }
+                Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))) {
+                    Row(modifier = Modifier.padding(8.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        daysOfWeek.forEachIndexed { index, day ->
+                            val dayValue = daysMapping[index]
+                            val isSelected = selectedDays.contains(dayValue)
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { selectedDays = if (isSelected) selectedDays - dayValue else selectedDays + dayValue },
+                                label = { Text(day, style = MaterialTheme.typography.bodySmall) }
+                            )
                         }
                     }
                 }
 
-                // Uhrzeiten Auswahl
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    OutlinedTextField(
-                        value = startTime,
-                        onValueChange = { if (it.length <= 5) startTime = it },
-                        label = { Text("Von (HH:mm)") },
-                        placeholder = { Text("08:00") },
-                        modifier = Modifier.weight(1f),
-                        enabled = !isSaving,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        leadingIcon = { Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                    )
-                    OutlinedTextField(
-                        value = endTime,
-                        onValueChange = { if (it.length <= 5) endTime = it },
-                        label = { Text("Bis (HH:mm)") },
-                        placeholder = { Text("20:00") },
-                        modifier = Modifier.weight(1f),
-                        enabled = !isSaving,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        leadingIcon = { Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                    )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    OutlinedTextField(value = startTime, onValueChange = { startTime = it }, label = { Text("Von") }, modifier = Modifier.weight(1f))
+                    OutlinedTextField(value = endTime, onValueChange = { endTime = it }, label = { Text("Bis") }, modifier = Modifier.weight(1f))
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Speicher-Button mit integrierter Geocoding- und Firebase-Logik
                 Button(
                     onClick = {
                         val startMin = parseTimeToMinutes(startTime)
                         val endMin = parseTimeToMinutes(endTime)
-
-                        when {
-                            title.isBlank() -> titleError = true
-                            address.isBlank() -> addressError = true
-                            selectedDays.isEmpty() -> Toast.makeText(context, "Bitte mindestens einen Tag wählen", Toast.LENGTH_SHORT).show()
-                            startMin == null || endMin == null -> Toast.makeText(context, "Ungültiges Zeitformat (HH:mm)", Toast.LENGTH_SHORT).show()
-                            startMin >= endMin -> Toast.makeText(context, "Startzeit muss vor Endzeit liegen", Toast.LENGTH_SHORT).show()
-                            else -> {
-                                isSaving = true
-                                scope.launch {
-                                    try {
-                                        // 1. Schritt: Foto verarbeiten (Base64 für Demo-Zwecke)
-                                        var encodedImage: String? = null
-                                        if (selectedImageUri != null) {
-                                            encodedImage = imageHelper.convertUriToBase64(selectedImageUri!!)
-                                        }
-
-                                        // 2. Schritt: Adresse in Koordinaten umwandeln (Geocoding)
-                                        val coords = geocodingHelper.getCoordinatesFromAddress(address)
-                                        
-                                        if (coords == null) {
-                                            isSaving = false
-                                            Toast.makeText(context, "Adresse konnte nicht gefunden werden", Toast.LENGTH_LONG).show()
-                                            return@launch
-                                        }
-
-                                        // 3. Schritt: Datenmodell befüllen mit zeitlicher Verfügbarkeit und Foto
+                        if (title.isBlank()) titleError = true
+                        else if (address.isBlank()) addressError = true
+                        else {
+                            isSaving = true
+                            scope.launch {
+                                try {
+                                    val encodedImage = if (selectedImageUri != null) imageHelper.convertUriToBase64(selectedImageUri!!) else null
+                                    val coords = geocodingHelper.getCoordinatesFromAddress(address)
+                                    if (coords != null) {
                                         val newSpot = ParkingSpot(
                                             title = title,
                                             description = description,
@@ -362,70 +240,38 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
                                             longitude = coords.second,
                                             ownerId = currentUserId,
                                             ownerName = currentUserName,
-                                            availableDays = selectedDays.toList().sorted(),
-                                            startMinute = startMin,
-                                            endMinute = endMin,
+                                            availableDays = selectedDays.toList(),
+                                            startMinute = startMin ?: 0,
+                                            endMinute = endMin ?: 1439,
                                             imageUrl = encodedImage
                                         )
-
-                                        // 4. Schritt: In der Cloud-Datenbank speichern
                                         firebaseHelper.saveParkingSpot(newSpot)
-
-                                        // Erfolgreich gespeichert -> Zurück zur Karte
-                                        isSaving = false
                                         onBackClick()
-                                    } catch (e: Exception) {
-                                        // Fehlerbehandlung
-                                        isSaving = false
-                                        Toast.makeText(context, "Fehler: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                                    } else {
+                                        Toast.makeText(context, "Adresse nicht gefunden", Toast.LENGTH_SHORT).show()
                                     }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Fehler: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                                } finally {
+                                    isSaving = false
                                 }
                             }
                         }
                     },
-                    enabled = !isSaving,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    enabled = !isSaving
                 ) {
-                    if (isSaving) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Text("Parkplatz erstellen", style = MaterialTheme.typography.titleMedium)
-                    }
+                    if (isSaving) CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                    else Text("Parkplatz erstellen")
                 }
-            }
-            
-            // Graues Overlay während des Speichervorgangs zur visuellen Sperrung
-            if (isSaving) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
-                ) {}
             }
         }
     }
 }
 
-/**
- * Hilfsfunktion zur Umrechnung von HH:mm in Minuten ab Mitternacht.
- */
 private fun parseTimeToMinutes(time: String): Int? {
     return try {
         val parts = time.split(":")
-        if (parts.size != 2) return null
-        val hours = parts[0].toInt()
-        val minutes = parts[1].toInt()
-        if (hours in 0..23 && minutes in 0..59) {
-            hours * 60 + minutes
-        } else {
-            null
-        }
-    } catch (e: Exception) {
-        null
-    }
+        parts[0].toInt() * 60 + parts[1].toInt()
+    } catch (e: Exception) { null }
 }
