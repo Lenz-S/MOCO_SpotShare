@@ -1,12 +1,10 @@
 package com.example.moco.data
 
-import android.net.Uri
 import com.example.moco.model.Booking
 import com.example.moco.model.ParkingSpot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
 import com.google.firebase.firestore.snapshots
-import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
@@ -14,11 +12,10 @@ import java.util.UUID
 
 /**
  * FirebaseHelper: Zentrale Daten-Schnittstelle der App (Repository-Ersatz).
- * Kapselt alle asynchronen Operationen für Firestore und Storage.
+ * Kapselt alle asynchronen Operationen für Firestore.
  */
 class FirebaseHelper {
     private val firestore = FirebaseFirestore.getInstance()
-    private val storage = FirebaseStorage.getInstance()
     private val spotsCollection = firestore.collection("parking_spots")
     private val bookingsCollection = firestore.collection("bookings")
     private val notificationsCollection = firestore.collection("notifications")
@@ -66,14 +63,6 @@ class FirebaseHelper {
             mapOf("fcmToken" to token),
             com.google.firebase.firestore.SetOptions.merge()
         ).await()
-    }
-
-    // --- NEBENLÄUFIGKEIT: ASYNCHRONE MEDIA-UPLOAD-FUNKTION ---
-    suspend fun uploadSpotImage(imageUri: Uri): String {
-        val fileName = "spots/${UUID.randomUUID()}.jpg"
-        val ref = storage.reference.child(fileName)
-        ref.putFile(imageUri).await() // .await() pausiert die Coroutine, bis der Upload fertig ist
-        return ref.downloadUrl.await().toString()
     }
 
     // --- NEBENLÄUFIGKEIT: ASYNCHRONE SCHREIBZUGRIFFE  ---

@@ -5,6 +5,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,12 +17,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import coil.compose.rememberAsyncImagePainter
 import com.example.moco.data.FirebaseHelper
 import com.example.moco.data.GeocodingHelper
+import com.example.moco.data.ImageHelper
 import com.example.moco.model.ParkingSpot
 import com.mapbox.geojson.Point
 import com.mapbox.maps.CameraOptions
@@ -58,6 +63,7 @@ fun MapScreen(
     val scope = rememberCoroutineScope() 
     val firebaseHelper = remember { FirebaseHelper() }
     val geocodingHelper = remember { GeocodingHelper(context) }
+    val imageHelper = remember { ImageHelper(context) }
     val sharedPrefs = remember { context.getSharedPreferences("moco_prefs", android.content.Context.MODE_PRIVATE) }
     
     // Aktuelle Benutzerinfos
@@ -257,6 +263,22 @@ fun MapScreen(
                         modifier = Modifier.fillMaxWidth().padding(16.dp).padding(bottom = 32.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        // BILD-ANZEIGE: Nutzt den ImageHelper zur Dekodierung
+                        if (!spot.imageUrl.isNullOrBlank()) {
+                            val imageModel = remember(spot.imageUrl) {
+                                imageHelper.getImageModel(spot.imageUrl)
+                            }
+                            Image(
+                                painter = rememberAsyncImagePainter(imageModel),
+                                contentDescription = "Parkplatz Foto",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp)
+                                    .clip(RoundedCornerShape(12.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+
                         Text(text = spot.title, style = MaterialTheme.typography.headlineMedium)
                         Text(text = spot.address, style = MaterialTheme.typography.bodyLarge)
                         Text(text = "Anbieter: ${spot.ownerName}", style = MaterialTheme.typography.bodyMedium)

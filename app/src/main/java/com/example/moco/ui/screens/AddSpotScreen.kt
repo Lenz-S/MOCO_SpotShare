@@ -1,35 +1,49 @@
 package com.example.moco.ui.screens
 
 import android.content.Context
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
+import coil.compose.rememberAsyncImagePainter
 import com.example.moco.data.FirebaseHelper
 import com.example.moco.data.GeocodingHelper
+import com.example.moco.data.ImageHelper
 import com.example.moco.model.ParkingSpot
 import kotlinx.coroutines.launch
+import java.io.File
 
 /**
- * AddSpotScreen: Ermöglicht das Anlegen eines neuen Parkplatzes.
- * Beinhaltet nun auch die Konfiguration der zeitlichen Verfügbarkeit.
- *
- * @param onBackClick Navigation zurück zur Kartenansicht.
+ * AddSpotScreen: Ermöglicht das Anlegen eines neuen Parkplatzes inklusive zeitlicher Verfügbarkeit und Foto.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,6 +54,7 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
     // Initialisierung der Daten-Helfer
     val firebaseHelper = remember { FirebaseHelper() }
     val geocodingHelper = remember { GeocodingHelper(context) }
+    val imageHelper = remember { ImageHelper(context) }
     val sharedPrefs = remember { context.getSharedPreferences("moco_prefs", Context.MODE_PRIVATE) }
 
     // Zustandsvariablen für die Formulareingaben
@@ -47,9 +62,33 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
     var description by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
     
+    // --- ZUSTAND: Foto ---
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    val tempImageUri = remember {
+        val file = File(context.cacheDir, "temp_image.jpg")
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    }
+
+    // Launcher für Galerie
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            selectedImageUri = uri
+        }
+    }
+
+    // Launcher für Kamera
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            selectedImageUri = tempImageUri
+        }
+    }
+
     // ZUSTAND: Zeitliche Verfügbarkeit
     val daysOfWeek = listOf("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
-    // Mapping auf Calendar-Konstanten: Mo=2, Di=3, Mi=4, Do=5, Fr=6, Sa=7, So=1
     val daysMapping = listOf(2, 3, 4, 5, 6, 7, 1)
     var selectedDays by remember { mutableStateOf(daysMapping.toSet()) }
     
@@ -89,6 +128,75 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // --- NEU: Foto-Sektion ---
+                Text(
+                    text = "Foto hinzufügen (Optional)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+                        .clickable {
+                            // Dialog oder BottomSheet zur Auswahl wäre schöner, 
+                            // hier erst mal direkt Buttons darunter.
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (selectedImageUri != null) {
+                        Image(
+                            painter = rememberAsyncImagePainter(selectedImageUri),
+                            contentDescription = "Ausgewähltes Bild",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.AddAPhoto,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                "Noch kein Foto ausgewählt",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { cameraLauncher.launch(tempImageUri) },
+                        modifier = Modifier.weight(1f),
+                        enabled = !isSaving
+                    ) {
+                        Icon(Icons.Default.AddAPhoto, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Kamera")
+                    }
+                    OutlinedButton(
+                        onClick = { galleryLauncher.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                        modifier = Modifier.weight(1f),
+                        enabled = !isSaving
+                    ) {
+                        Icon(Icons.Default.PhotoLibrary, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Galerie")
+                    }
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
                 // Eingabefeld für den Parkplatz-Namen
                 OutlinedTextField(
@@ -230,16 +338,22 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
                                 isSaving = true
                                 scope.launch {
                                     try {
-                                        // 1. Schritt: Adresse in Koordinaten umwandeln (Geocoding)
-                                        val coords = geocodingHelper.getCoordinatesFromAddress(address)
+                                        // 1. Schritt: Foto verarbeiten (Base64 für Demo-Zwecke)
+                                        var encodedImage: String? = null
+                                        if (selectedImageUri != null) {
+                                            encodedImage = imageHelper.convertUriToBase64(selectedImageUri!!)
+                                        }
 
+                                        // 2. Schritt: Adresse in Koordinaten umwandeln (Geocoding)
+                                        val coords = geocodingHelper.getCoordinatesFromAddress(address)
+                                        
                                         if (coords == null) {
                                             isSaving = false
                                             Toast.makeText(context, "Adresse konnte nicht gefunden werden", Toast.LENGTH_LONG).show()
                                             return@launch
                                         }
 
-                                        // 2. Schritt: Datenmodell befüllen mit zeitlicher Verfügbarkeit
+                                        // 3. Schritt: Datenmodell befüllen mit zeitlicher Verfügbarkeit und Foto
                                         val newSpot = ParkingSpot(
                                             title = title,
                                             description = description,
@@ -250,10 +364,11 @@ fun AddSpotScreen(onBackClick: () -> Unit) {
                                             ownerName = currentUserName,
                                             availableDays = selectedDays.toList().sorted(),
                                             startMinute = startMin,
-                                            endMinute = endMin
+                                            endMinute = endMin,
+                                            imageUrl = encodedImage
                                         )
 
-                                        // 3. Schritt: In der Cloud-Datenbank speichern
+                                        // 4. Schritt: In der Cloud-Datenbank speichern
                                         firebaseHelper.saveParkingSpot(newSpot)
 
                                         // Erfolgreich gespeichert -> Zurück zur Karte

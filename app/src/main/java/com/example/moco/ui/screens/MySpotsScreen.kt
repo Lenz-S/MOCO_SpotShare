@@ -1,6 +1,7 @@
 package com.example.moco.ui.screens
 
 import android.content.Context
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,15 +15,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.moco.data.FirebaseHelper
+import com.example.moco.data.ImageHelper
 import com.example.moco.model.ParkingSpot
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.ui.text.font.FontWeight
+import coil.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.launch
 
 /**
@@ -35,6 +40,7 @@ fun MySpotsScreen(onBackClick: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val firebaseHelper = remember { FirebaseHelper() }
+    val imageHelper = remember { ImageHelper(context) }
     val sharedPrefs = remember { context.getSharedPreferences("moco_prefs", Context.MODE_PRIVATE) }
     
     val userId = sharedPrefs.getString("user_id", "user_number_one") ?: "user_number_one"
@@ -77,6 +83,7 @@ fun MySpotsScreen(onBackClick: () -> Unit) {
                         items(mySpots!!) { spot ->
                             MySpotDashboardItem(
                                 spot = spot,
+                                imageHelper = imageHelper,
                                 onDeleteClick = {
                                     scope.launch {
                                         firebaseHelper.deleteParkingSpot(spot.id)
@@ -94,6 +101,7 @@ fun MySpotsScreen(onBackClick: () -> Unit) {
 @Composable
 fun MySpotDashboardItem(
     spot: ParkingSpot,
+    imageHelper: ImageHelper,
     onDeleteClick: () -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -121,6 +129,23 @@ fun MySpotDashboardItem(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            // Bild-Anzeige (Base64)
+            if (!spot.imageUrl.isNullOrBlank()) {
+                val imageModel = remember(spot.imageUrl) {
+                    imageHelper.getImageModel(spot.imageUrl)
+                }
+                Image(
+                    painter = rememberAsyncImagePainter(imageModel),
+                    contentDescription = "Parkplatz Foto",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
             // Header: Titel und Lösch-Button
             Row(
                 modifier = Modifier.fillMaxWidth(),
