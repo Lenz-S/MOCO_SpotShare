@@ -19,6 +19,7 @@ import com.example.moco.model.ParkingSpot
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.alpha
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Person
@@ -31,7 +32,7 @@ import kotlinx.coroutines.launch
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MySpotsScreen(onBackClick: () -> Unit) {
+fun MySpotsScreen(onEditClick: (String) -> Unit, onBackClick: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val firebaseHelper = remember { FirebaseHelper() }
@@ -77,6 +78,7 @@ fun MySpotsScreen(onBackClick: () -> Unit) {
                         items(mySpots!!) { spot ->
                             MySpotDashboardItem(
                                 spot = spot,
+                                onEditClick = { onEditClick(spot.id) },
                                 onDeleteClick = {
                                     scope.launch {
                                         firebaseHelper.deleteParkingSpot(spot.id)
@@ -94,6 +96,7 @@ fun MySpotsScreen(onBackClick: () -> Unit) {
 @Composable
 fun MySpotDashboardItem(
     spot: ParkingSpot,
+    onEditClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -131,19 +134,26 @@ fun MySpotDashboardItem(
                     Text(text = spot.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(text = spot.address, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                 }
-                IconButton(onClick = { showDeleteDialog = true }) {
-                    Icon(imageVector = Icons.Default.Delete, contentDescription = "Löschen", tint = MaterialTheme.colorScheme.error)
+                Row {
+                    IconButton(onClick = onEditClick) {
+                        Icon(imageVector = Icons.Default.Edit, contentDescription = "Bearbeiten", tint = MaterialTheme.colorScheme.primary)
+                    }
+                    IconButton(onClick = { showDeleteDialog = true }) {
+                        Icon(imageVector = Icons.Default.Delete, contentDescription = "Löschen", tint = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Status-Badge
-            val (statusText, statusColor) = if (spot.isAvailable) {
-                "FREI" to Color(0xFF4CAF50)
-            } else {
-                "BELEGT" to Color(0xFFF44336)
+            // Status-Badge mit Kapazitäts-Anzeige
+            val occupancyPercent = if (spot.capacity > 0) spot.occupiedCount.toFloat() / spot.capacity else 1f
+            val statusColor = when {
+                spot.occupiedCount == 0 -> Color(0xFF4CAF50) // Frei (Grün)
+                spot.occupiedCount < spot.capacity -> Color(0xFFFF9800) // Teilweise belegt (Orange)
+                else -> Color(0xFFF44336) // Voll (Rot)
             }
+            val statusText = "${spot.occupiedCount} / ${spot.capacity} Plätze belegt"
 
             Surface(
                 color = statusColor.copy(alpha = 0.1f),
@@ -159,8 +169,8 @@ fun MySpotDashboardItem(
                 )
             }
 
-            // Mieter-Details (nur wenn belegt)
-            if (!spot.isAvailable) {
+            // Mieter-Details (nur wenn mindestens einer belegt)
+            if (spot.occupiedCount > 0) {
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider(modifier = Modifier.alpha(0.5f))
                 Spacer(modifier = Modifier.height(12.dp))

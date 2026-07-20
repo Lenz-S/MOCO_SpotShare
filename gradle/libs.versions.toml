@@ -14,7 +14,9 @@ mapboxSearch = "2.8.0"
 mapboxJava = "7.3.0"
 navigationCompose = "2.8.8"
 googleServices = "4.4.4"
+playServicesLocation = "21.3.0"
 firebaseBom = "34.14.0"
+coil = "2.6.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -34,23 +36,26 @@ androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-te
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 # Mapbox Compose Extension
-mapbox-compose = { group = "com.mapbox.extension", name = "maps-compose-ndk27", version.ref = "mapboxCompose" }
+mapbox-compose = { group = "com.mapbox.extension", name = "maps-compose", version.ref = "mapboxCompose" }
 # Mapbox Core SDK - Wird benötigt für Klassen wie CameraState
-mapbox-maps = { group = "com.mapbox.maps", name = "android-ndk27", version.ref = "mapboxCompose" }
+mapbox-maps = { group = "com.mapbox.maps", name = "android", version.ref = "mapboxCompose" }
 
-mapbox-search = { group = "com.mapbox.maps", name = "mapbox-search-android", version.ref = "mapboxSearch"}
+mapbox-search = { group = "com.mapbox.search", name = "mapbox-search-android", version.ref = "mapboxSearch"}
 
-mapbox-java-services = { group = "com.mapbox.mapboxsdk", name = "mapbox-sdk-service", version.ref = "mapboxJava"}
+mapbox-java-services = { group = "com.mapbox.mapboxsdk", name = "mapbox-sdk-services", version.ref = "mapboxJava"}
 mapbox-java-geojson = { group = "com.mapbox.mapboxsdk", name = "mapbox-sdk-geojson", version.ref = "mapboxJava"}
+play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version = "2.9.0" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 
 
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
-firebase-firestore = { group = "com.google.firebase", name = "firebase-analytics" }
+firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
 firebase-storage = { group = "com.google.firebase", name = "firebase-storage" }
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
+coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -44,6 +44,10 @@ data class ParkingSpot(
     @set:PropertyName("isAvailable")
     var isAvailable: Boolean = true,
 
+    // Kapazitäts-Management (Neu: 1-99 Plätze)
+    val capacity: Int = 1,
+    val occupiedCount: Int = 0,
+
     // Mieter-Informationen (Wird beim Check-In durch dich befüllt)
     val currentTenantId: String? = null,
     val currentTenantName: String? = null,

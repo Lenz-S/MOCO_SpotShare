@@ -15,8 +15,8 @@ if (localPropertiesFile.exists()) {
 
 android {
     namespace = "com.example.moco"
-    // Erhöht auf 37, da neuere androidx-Abhängigkeiten dies zwingend erfordern
-    compileSdk = 37
+    // Erhöht auf 36, da neuere androidx-Abhängigkeiten dies zwingend erfordern
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.moco"
@@ -52,12 +52,6 @@ android {
         // Ermöglicht das Hinzufügen von Ressourcen (wie dem Mapbox Token) direkt aus Gradle
         resValues = true
     }
-
-    packaging {
-        jniLibs {
-            useLegacyPackaging = false
-        }
-    }
 }
 
 dependencies {
@@ -65,27 +59,16 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
-    // Image loading with Coil for Jetpack Compose (AsyncImage)
-    implementation("io.coil-kt:coil-compose:2.4.0")
-
     // Hinzufügen der Mapbox Compose Library
     implementation(libs.mapbox.compose)
     // maps-android wird zwingend für Kamera-Zustände und Basis-Klassen benötigt
     implementation(libs.mapbox.maps)
-    
-    // Mapbox Search SDK für Geocoding (Adresse -> Koordinaten)
-    implementation("com.mapbox.search:mapbox-search-android:2.1.0") {
-        exclude(group = "com.mapbox.common", module = "common")
-    }
+    implementation(libs.mapbox.search)
+    implementation(libs.mapbox.java.services)
+    implementation(libs.mapbox.java.geojson)
+    implementation(libs.play.services.location)
+    implementation(libs.retrofit)
 
-    // (Mapbox-Geocoding war zuvor verwendet; wir nutzen Android Geocoder stattdessen — kein zusätzlicher Mapbox-Client nötig)
-
-    // Firebase Firestore / Storage (Versionen werden vom Firebase BOM gesteuert)
-    implementation("com.google.firebase:firebase-firestore")
-    implementation("com.google.firebase:firebase-storage")
-
-    // Coroutine integration for Task await() helpers
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
     // Navigation Library für den Wechsel zwischen den Screens
     implementation(libs.androidx.navigation.compose)
@@ -96,6 +79,16 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
+    implementation(libs.firebase.messaging)
+    implementation(libs.firebase.firestore)
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.storage)
+    implementation(libs.coil.compose)
+
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
@@ -103,7 +96,4 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.analytics)
-    implementation(libs.firebase.messaging)
 }

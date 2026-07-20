@@ -154,9 +154,19 @@ fun MocoAppMain() {
 
             composable(Screen.Profile.route) { ProfileScreen(onBackClick = { backToMap() }) }
             composable(Screen.Messages.route) { MessagesScreen(onBackClick = { backToMap() }) }
-            composable(Screen.AddSpot.route) { AddSpotScreen(onBackClick = { backToMap() }) }
+            composable(Screen.AddSpot.route) { backStackEntry ->
+                val spotId = backStackEntry.arguments?.getString("spotId")
+                AddSpotScreen(spotId = spotId, onBackClick = { backToMap() })
+            }
             composable(Screen.Favorites.route) { FavoritesScreen(onBackClick = { backToMap() }) }
-            composable(Screen.MySpots.route) { MySpotsScreen(onBackClick = { backToMap() }) }
+            composable(Screen.MySpots.route) { 
+                MySpotsScreen(
+                    onEditClick = { spotId ->
+                        navController.navigate(Screen.AddSpot.createRoute(spotId))
+                    },
+                    onBackClick = { backToMap() }
+                ) 
+            }
 
             composable(Screen.Search.route) {
                 SearchScreen(

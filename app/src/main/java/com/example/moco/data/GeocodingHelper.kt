@@ -1,52 +1,63 @@
 package com.example.moco.data
 
 import android.content.Context
-import android.location.Address
-import android.location.Geocoder
-import android.os.Build
-import kotlinx.coroutines.Dispatchers
+import com.example.moco.R
+import com.mapbox.api.geocoding.v5.MapboxGeocoding
+import com.mapbox.api.geocoding.v5.models.GeocodingResponse
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withContext
-import java.util.Locale
 import kotlin.coroutines.resume
 
 /**
- * GeocodingHelper: Wandelt Adressen in Koordinaten um.
- * Nutzt die moderne Android Geocoder API mit Coroutine-Unterstützung.
+ * Helper-Klasse für das Geocoding (Adresse -> Koordinaten).
+ * Nutzt das Mapbox Java SDK (Geocoding API v5), wie in der offiziellen Dokumentation empfohlen.
  */
 class GeocodingHelper(private val context: Context) {
-    suspend fun getCoordinatesFromAddress(address: String): Pair<Double, Double>? = withContext(Dispatchers.IO) {
-        val geocoder = Geocoder(context, Locale.getDefault())
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // Moderner asynchroner Ansatz für Android 13+
-            suspendCancellableCoroutine { continuation ->
-                geocoder.getFromLocationName(address, 1, object : Geocoder.GeocodeListener {
-                    override fun onGeocode(addresses: MutableList<Address>) {
-                        if (addresses.isNotEmpty()) {
-                            val loc = addresses[0]
-                            continuation.resume(Pair(loc.latitude, loc.longitude))
-                        } else {
-                            continuation.resume(null)
-                        }
-                    }
-                    override fun onError(errorMessage: String?) {
+    /**
+     * Wandelt eine Adresse in Koordinaten um.
+     * Nutzt Coroutines (suspend), um das Ergebnis asynchron zurückzugeben.
+     * 
+     * @param address Die vom Nutzer eingegebene Adresse.
+     * @return Ein Pair aus Latitude und Longitude oder null bei Fehler.
+     */
+    suspend fun getCoordinatesFromAddress(address: String): Pair<Double, Double>? = suspendCancellableCoroutine { continuation ->
+        val mapboxGeocoding = MapboxGeocoding.builder()
+            .accessToken(context.getString(R.string.mapbox_access_token))
+            .query(address)
+            .limit(1)
+            .build()
+
+        mapboxGeocoding.enqueueCall(object : Callback<GeocodingResponse> {
+            override fun onResponse(call: Call<GeocodingResponse>, response: Response<GeocodingResponse>) {
+                val results = response.body()?.features()
+                if (!results.isNullOrEmpty()) {
+                    val point = results[0].center()
+                    if (point != null) {
+                        // Mapbox liefert [longitude, latitude]
+                        continuation.resume(Pair(point.latitude(), point.longitude()))
+                    } else {
                         continuation.resume(null)
                     }
-                })
+                } else {
+                    continuation.resume(null)
+                }
             }
-        } else {
-            // Fallback für ältere Versionen (blockierend, daher im IO-Thread)
-            try {
-                @Suppress("DEPRECATION")
-                val results = geocoder.getFromLocationName(address, 1)
-                if (!results.isNullOrEmpty()) {
-                    val loc = results[0]
-                    Pair(loc.latitude, loc.longitude)
-                } else null
-            } catch (e: Exception) {
-                null
+
+            override fun onFailure(call: Call<GeocodingResponse>, t: Throwable) {
+                if (continuation.isActive) {
+                    continuation.resume(null)
+                }
             }
+        })
+
+        continuation.invokeOnCancellation {
+            // Falls die Coroutine abgebrochen wird, brechen wir auch den Netzwerk-Call ab
+            mapboxGeocoding.cancelCall()
         }
+
     }
 }
+

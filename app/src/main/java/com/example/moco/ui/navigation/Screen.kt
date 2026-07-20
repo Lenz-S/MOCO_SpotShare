@@ -8,7 +8,9 @@ sealed class Screen(val route: String) {
     object Map : Screen("map_screen")
     object Profile : Screen("profile_screen")
     object Messages : Screen("messages_screen")
-    object AddSpot : Screen("add_spot_screen")
+    object AddSpot : Screen("add_spot_screen?spotId={spotId}") {
+        fun createRoute(spotId: String? = null) = if (spotId != null) "add_spot_screen?spotId=$spotId" else "add_spot_screen"
+    }
     object Favorites : Screen("favorites_screen")
     object MySpots : Screen("my_spots_screen")
     object Search : Screen("search_screen")
